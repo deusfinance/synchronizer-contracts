@@ -4,6 +4,8 @@ node_modules
 cache
 artifacts
 
+.env
+
 # IDE files
 .idea/
 .code/
