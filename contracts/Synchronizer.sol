@@ -18,22 +18,26 @@
 
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./IDEIStablecoin.sol";
-import "./IRegistrar.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "./interfaces/ISynchronizer.sol";
+import "./interfaces/IMuonV02.sol";
+import "./interfaces/IDEIStablecoin.sol";
+import "./interfaces/IRegistrar.sol";
 
 
-contract Synchronizer is AccessControl {
-	// roles
-	bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
-	bytes32 public constant FEE_WITHDRAWER_ROLE = keccak256("FEE_WITHDRAWER_ROLE");
+contract Synchronizer is ISynchronizer, Ownable {
+	using ECDSA for bytes32;
 
 	// variables
-	uint256 public minimumRequiredSignature;
-	uint256 public scale = 1e18;
-	uint256 public withdrawableFeeAmount;
-	uint256 public bridgeReserve;
-	IDEIStablecoin public dei;
+	address public muonContract;  // address of muon verifier contract
+	address public deiContract;
+	uint256 public minimumRequiredSignature;  // number of signatures that required
+	uint256 public scale = 1e18;  // used for math
+	uint256 public withdrawableFeeAmount;  // trading fee amount
+	uint256 public virtualReserve;
+	uint8 public APP_ID;  // muon's app id
+	bool public useVirtualReserve;
 
 	// events
 	event Buy(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
@@ -42,52 +46,64 @@ contract Synchronizer is AccessControl {
 
 	constructor (
 		uint256 _minimumRequiredSignature,
-		uint256 _bridgeReserve,
+		uint256 _virtualReserve,
 		address _collateralToken
 	) {
 		minimumRequiredSignature = _minimumRequiredSignature;
-		bridgeReserve = _bridgeReserve;
-		dei = IDEIStablecoin(_collateralToken);
-		_setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-		_setupRole(FEE_WITHDRAWER_ROLE, msg.sender);
+		virtualReserve = _virtualReserve;
+		deiContract = _collateralToken;
 	}
 
 	// This function use pool feature to handle buyback and recollateralize on DEI minter pool
     function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
-        uint256 collateralRatio = dei.global_collateral_ratio();
-        return (bridgeReserve * collateralRatio) / 1e6;
+        uint256 collateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
+        return (virtualReserve * collateralRatio) / 1e6;
+    }
+
+	function getChainID() public view returns (uint256) {
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        return id;
     }
 
 	function sellFor(
 		address _user,
-		uint256 multiplier,
 		address registrar,
 		uint256 amount,
 		uint256 fee,
-		uint256[] memory blockNos,
-		uint256[] memory prices,
-		uint8[] memory v,
-		bytes32[] memory r,
-		bytes32[] memory s
+		uint256 expireBlock,
+		uint256 price,
+		bytes calldata _reqId,
+		SchnorrSign[] calldata sigs
 	)
 		external
 	{
-		uint256 price = prices[0];
-		address lastOracle;
+		require(
+            sigs.length >= minimumRequiredSignature,
+            "insufficient number of signatures"
+        );
 
-		for (uint256 index = 0; index < minimumRequiredSignature; ++index) {
-			require(blockNos[index] >= block.number, "Signature is expired");
-			if(prices[index] < price) {
-				price = prices[index];
-			}
-			address oracle = getSigner(registrar, 8, multiplier, fee, blockNos[index], prices[index], v[index], r[index], s[index]);
-			require(hasRole(ORACLE_ROLE, oracle), "signer is not an oracle");
+		{
+            bytes32 hash = keccak256(
+                abi.encodePacked(
+                    registrar, 
+					price, 
+					fee, 
+					expireBlock, 
+					uint256(0),
+					getChainID(),
+					APP_ID
+                )
+            );
 
-			require(oracle > lastOracle, "Signers are same");
-			lastOracle = oracle;
-		}
-
-		//---------------------------------------------------------------------------------
+            IMuonV02 muon = IMuonV02(muonContract);
+            require(
+                muon.verify(_reqId, uint256(hash), sigs),
+                "not verified"
+            );
+        }
 
 		uint256 collateralAmount = amount * price / scale;
 		uint256 feeAmount = collateralAmount * fee / scale;
@@ -96,105 +112,95 @@ contract Synchronizer is AccessControl {
 
 		IRegistrar(registrar).burn(msg.sender, amount);
 
-		dei.pool_mint(_user, collateralAmount - feeAmount);
+		uint256 deiAmount = collateralAmount - feeAmount;
+		IDEIStablecoin(deiContract).pool_mint(_user, deiAmount);
+		if (useVirtualReserve) virtualReserve += deiAmount;
 
 		emit Sell(_user, registrar, amount, collateralAmount, feeAmount);
 	}
 
 	function buyFor(
 		address _user,
-		uint256 multiplier,
 		address registrar,
 		uint256 amount,
 		uint256 fee,
-		uint256[] memory blockNos,
-		uint256[] memory prices,
-		uint8[] memory v, 
-		bytes32[] memory r,
-		bytes32[] memory s
+		uint256 expireBlock,
+		uint256 price,
+		bytes calldata _reqId,
+		SchnorrSign[] calldata sigs
 	)
 		external
 	{
-		uint256 price = prices[0];
-        address lastOracle;
-        
-		for (uint256 index = 0; index < minimumRequiredSignature; ++index) {
-			require(blockNos[index] >= block.number, "Signature is expired");
-			if(prices[index] > price) {
-				price = prices[index];
-			}
-			address oracle = getSigner(registrar, 9, multiplier, fee, blockNos[index], prices[index], v[index], r[index], s[index]);
-			require(hasRole(ORACLE_ROLE, oracle), "Signer is not an oracle");
+		require(
+            sigs.length >= minimumRequiredSignature,
+            "insufficient number of signatures"
+        );
+		require(amount > 0, "amount should be bigger than 0");
 
-			require(oracle > lastOracle, "Signers are same");
-			lastOracle = oracle;
-		}
+		{
+            bytes32 hash = keccak256(
+                abi.encodePacked(
+                    registrar, 
+					price, 
+					fee, 
+					expireBlock, 
+					uint256(1),
+					getChainID(),
+					APP_ID
+                )
+            );
 
-		//---------------------------------------------------------------------------------
+            IMuonV02 muon = IMuonV02(muonContract);
+            require(
+                muon.verify(_reqId, uint256(hash), sigs),
+                "not verified"
+            );
+        }
+
 		uint256 collateralAmount = amount * price / scale;
 		uint256 feeAmount = collateralAmount * fee / scale;
 
 		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
 
-		dei.pool_burn_from(msg.sender, collateralAmount + feeAmount);
+		uint256 deiAmount = collateralAmount + feeAmount;
+		IDEIStablecoin(deiContract).pool_burn_from(msg.sender, deiAmount);
+		if (useVirtualReserve) virtualReserve -= deiAmount;
 
 		IRegistrar(registrar).mint(_user, amount);
 
 		emit Buy(_user, registrar, amount, collateralAmount, feeAmount);
 	}
 
-	function getSigner(
-		address registrar,
-		uint256 isBuy,
-		uint256 multiplier,
-		uint256 fee,
-		uint256 blockNo,
-		uint256 price,
-		uint8 v,
-		bytes32 r,
-		bytes32 s
-	)
-		pure
-		internal
-		returns (address)
-	{
-        bytes32 message = prefixed(keccak256(abi.encodePacked(registrar, isBuy, multiplier, fee, blockNo, price)));
-		return ecrecover(message, v, r, s);
-    }
 
-	function prefixed(
-		bytes32 hash
-	)
-		internal
-		pure
-		returns(bytes32)
-	{
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
-    }
-
-	//---------------------------------------------------------------------------------------
-
-	function withdrawFee(uint256 _amount, address _recipient) external {
-		require(hasRole(FEE_WITHDRAWER_ROLE, msg.sender), "Caller is not a FeeWithdrawer");
-		withdrawableFeeAmount = withdrawableFeeAmount - _amount;
-		dei.pool_mint(_recipient, _amount);
-		emit WithdrawFee(_amount, _recipient);
+	function withdrawFee(uint256 amount_, address recipient_) external onlyOwner {
+		withdrawableFeeAmount = withdrawableFeeAmount - amount_;
+		IDEIStablecoin(deiContract).pool_mint(recipient_, amount_);
+		emit WithdrawFee(amount_, recipient_);
 	}
 
-	function setMinimumRequiredSignature(uint256 _minimumRequiredSignature) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
+	function setMinimumRequiredSignature(uint256 _minimumRequiredSignature) external onlyOwner {
 		minimumRequiredSignature = _minimumRequiredSignature;
 	}
 
-	function setScale(uint _scale) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		scale = _scale;
+	function setScale(uint scale_) external onlyOwner {
+		scale = scale_;
 	}
 
-	function setBridgeReserve(uint256 bridgeReserve_) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-        bridgeReserve = bridgeReserve_;
+	function setAppId(uint8 APP_ID_) external onlyOwner {
+		APP_ID = APP_ID_;
+	}
+
+	function setvirtualReserve(uint256 virtualReserve_) external onlyOwner {
+        virtualReserve = virtualReserve_;
     }
+
+	function setMuonContract(address muonContract_) external onlyOwner {
+		muonContract = muonContract_;
+	}
+
+	function toggleUseVirtualReserve() external onlyOwner {
+		useVirtualReserve = !useVirtualReserve;
+	}
 }
 
 //Dar panah khoda

@@ -5,35 +5,33 @@
 
 pragma solidity ^0.8.3;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IRoleChecker.sol";
 import "./dERC20.sol";
 
-contract Registrar is dERC20, AccessControl {
+contract Registrar is dERC20, Ownable {
 
-	bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-	bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
-	bytes32 public constant LIQUIDATOR_ROLE = keccak256("LIQUIDATOR_ROLE");
+	address public roleChecker;
 
-	constructor(address admin, address synchronizer, address liquidator, string memory name, string memory symbol) dERC20(name, symbol) {
-		_setupRole(DEFAULT_ADMIN_ROLE, admin);
-		_setupRole(MINTER_ROLE, synchronizer);
-		_setupRole(BURNER_ROLE, synchronizer);
-		_setupRole(LIQUIDATOR_ROLE, liquidator);
+	constructor(address roleChecker_, string memory name, string memory symbol) dERC20(name, symbol) {
+		roleChecker = roleChecker_;
 	}
 
-	function rename(string memory name, string memory symbol) external {
-		require(hasRole(LIQUIDATOR_ROLE, msg.sender), "Caller is not a liquidator");
+	modifier hasRole(address user) {
+		require(IRoleChecker(roleChecker).verify(user), "Caller doesnt have role");
+		_;
+	}
+
+	function rename(string memory name, string memory symbol) external hasRole(msg.sender) {
 		_name = name;
 		_symbol = symbol;
 	}
 
-	function mint(address to, uint256 amount) external {
-        require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
+	function mint(address to, uint256 amount) external hasRole(msg.sender) {
         _mint(to, amount);
     }
 
-	function burn(address from, uint256 amount) external {
-        require(hasRole(BURNER_ROLE, msg.sender), "Caller is not a burner");
+	function burn(address from, uint256 amount) external hasRole(msg.sender) {
         _burn(from, amount);
     }
 

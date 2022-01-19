@@ -3,32 +3,22 @@
 
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.3;
+pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Registrar.sol";
 
-contract Conductor is AccessControl {
-    mapping(string => address) public registrars;
-
-	address public synchronizer;
-	address public admin;
-	address public liquidator;
+contract Conductor is Ownable {
+	address public roleChecker;
 
     event Conduct(string _id, address short, address long);
 
-	constructor(address _synchronizer, address _admin, address _liquidator) {
-		synchronizer = _synchronizer;
-		admin = _admin;	
-		liquidator = _liquidator;
-		_setupRole(DEFAULT_ADMIN_ROLE, _admin);
+	constructor(address roleChecker_) {
+		roleChecker = roleChecker_;
 	}
 
-	function setAddresses(address _synchronizer, address _admin, address _liquidator) public{
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		liquidator = _liquidator;
-		synchronizer = _synchronizer;
-		admin = _admin;	
+	function setRoleChecker(address roleChecker_) external onlyOwner {
+		roleChecker = roleChecker_;
 	}
 
 	function adminConduct(
@@ -37,14 +27,11 @@ contract Conductor is AccessControl {
 		string memory shortSymbol,
 		string memory longName,
 		string memory longSymbol
-	)external{
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		Registrar short = new Registrar(admin, synchronizer, liquidator, shortName, shortSymbol);
-		Registrar long = new Registrar(admin, synchronizer, liquidator, longName, longSymbol);
-
-        registrars[_id] = address(long);
+	) external {
+		Registrar short = new Registrar(roleChecker, shortName, shortSymbol);
+		Registrar long = new Registrar(roleChecker, longName, longSymbol);
     
-        emit conduct(_id, address(short), address(long));
+        emit Conduct(_id, address(short), address(long));
 	}
 
 }

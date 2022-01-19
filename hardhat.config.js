@@ -31,10 +31,10 @@ module.exports = {
 		localhost: {
 			url: 'http://127.0.0.1:8545',
 			accounts: [
-				process.env.DEPLOYER_PRIVATE_KEY,
+				process.env.SYNC_DEPLOYER_PRIVATE_KEY
 			],
 		},
-    fantom: {
+   		fantom: {
 			url: "https://rpc.ftm.tools/",
 			accounts: [
 				process.env.SYNC_DEPLOYER_PRIVATE_KEY

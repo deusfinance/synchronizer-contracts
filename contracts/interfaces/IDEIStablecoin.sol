@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-
 pragma solidity ^0.8.10;
 
 interface IDEIStablecoin {
@@ -7,5 +6,3 @@ interface IDEIStablecoin {
     function pool_mint(address m_address, uint256 m_amount) external;
     function global_collateral_ratio() external view returns (uint256);
 }
-
-//Dar panah khoda
