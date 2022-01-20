@@ -21,17 +21,19 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/ISynchronizer.sol";
-import "./interfaces/IMuonV02.sol";
 import "./interfaces/IDEIStablecoin.sol";
 import "./interfaces/IRegistrar.sol";
 
 
+/// @title Synchronizer
+/// @author deus.finance
+/// @notice deus ecosystem synthetics token trading contract
 contract Synchronizer is ISynchronizer, Ownable {
 	using ECDSA for bytes32;
 
 	// variables
 	address public muonContract;  // address of muon verifier contract
-	address public deiContract;
+	address public deiContract;  // address of dei token
 	uint256 public minimumRequiredSignature;  // number of signatures that required
 	uint256 public scale = 1e18;  // used for math
 	uint256 public withdrawableFeeAmount;  // trading fee amount
@@ -39,7 +41,6 @@ contract Synchronizer is ISynchronizer, Ownable {
 	uint8 public APP_ID;  // muon's app id
 	bool public useVirtualReserve;
 
-	// events
 	event Buy(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
 	event Sell(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
 	event WithdrawFee(uint256 amount, address recipient);
@@ -54,12 +55,17 @@ contract Synchronizer is ISynchronizer, Ownable {
 		deiContract = _collateralToken;
 	}
 
-	// This function use pool feature to handle buyback and recollateralize on DEI minter pool
+	/// @notice This function use pool feature to manage buyback and recollateralize on DEI minter pool
+	/// @dev simulates the collateral in the contract
+	/// @param collat_usd_price pool's collateral price (is 1e6) (decimal is 6)
+	/// @return amount of collateral in the contract
     function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
         uint256 collateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
         return (virtualReserve * collateralRatio) / 1e6;
     }
 
+	/// @notice used for trade signatures
+	/// @return number of chainID
 	function getChainID() public view returns (uint256) {
         uint256 id;
         assembly {
@@ -68,6 +74,16 @@ contract Synchronizer is ISynchronizer, Ownable {
         return id;
     }
 
+	/// @notice sell the synthetic tokens
+	/// @dev SchnorrSign is a TSS structure
+	/// @param _user collateral will be send to the _user
+	/// @param registrar synthetic token address
+	/// @param amount synthetic token amount (decimal is 18)
+	/// @param fee trading fee
+	/// @param expireBlock signature expire time
+	/// @param price synthetic token price
+	/// @param _reqId muon request id
+	/// @param sigs muon network TSS signatures
 	function sellFor(
 		address _user,
 		address registrar,
@@ -82,7 +98,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	{
 		require(
             sigs.length >= minimumRequiredSignature,
-            "insufficient number of signatures"
+            "SYNCHRONIZER: insufficient number of signatures"
         );
 
 		{
@@ -101,7 +117,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             IMuonV02 muon = IMuonV02(muonContract);
             require(
                 muon.verify(_reqId, uint256(hash), sigs),
-                "not verified"
+                "SYNCHRONIZER: not verified"
             );
         }
 
@@ -119,6 +135,16 @@ contract Synchronizer is ISynchronizer, Ownable {
 		emit Sell(_user, registrar, amount, collateralAmount, feeAmount);
 	}
 
+	/// @notice buy the synthetic tokens
+	/// @dev SchnorrSign is a TSS structure
+	/// @param _user collateral will be send to the _user
+	/// @param registrar synthetic token address
+	/// @param amount synthetic token amount (decimal is 18)
+	/// @param fee trading fee
+	/// @param expireBlock signature expire time
+	/// @param price synthetic token price
+	/// @param _reqId muon request id
+	/// @param sigs muon network TSS signatures
 	function buyFor(
 		address _user,
 		address registrar,
@@ -133,7 +159,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	{
 		require(
             sigs.length >= minimumRequiredSignature,
-            "insufficient number of signatures"
+            "SYNCHRONIZER: insufficient number of signatures"
         );
 		require(amount > 0, "amount should be bigger than 0");
 
@@ -153,7 +179,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             IMuonV02 muon = IMuonV02(muonContract);
             require(
                 muon.verify(_reqId, uint256(hash), sigs),
-                "not verified"
+                "SYNCHRONIZER: not verified"
             );
         }
 
@@ -171,13 +197,18 @@ contract Synchronizer is ISynchronizer, Ownable {
 		emit Buy(_user, registrar, amount, collateralAmount, feeAmount);
 	}
 
-
+	/// @notice withdraw accumulated trading fee by DAO
+	/// @dev fee will be minted in DEI
+	/// @param amount_ fee amount that DAO want to withdraw
+	/// @param recipient_ receiver of fee
 	function withdrawFee(uint256 amount_, address recipient_) external onlyOwner {
 		withdrawableFeeAmount = withdrawableFeeAmount - amount_;
 		IDEIStablecoin(deiContract).pool_mint(recipient_, amount_);
 		emit WithdrawFee(amount_, recipient_);
 	}
 
+	/// @notice changes minimum required signatures in trading functions by DAO
+	/// @param _minimumRequiredSignature number of required signatures
 	function setMinimumRequiredSignature(uint256 _minimumRequiredSignature) external onlyOwner {
 		minimumRequiredSignature = _minimumRequiredSignature;
 	}
@@ -186,6 +217,9 @@ contract Synchronizer is ISynchronizer, Ownable {
 		scale = scale_;
 	}
 
+	/// @notice changes muon's app id by DAO
+	/// @dev each app becomes different from others by app id
+	/// @param APP_ID_ muon's app id
 	function setAppId(uint8 APP_ID_) external onlyOwner {
 		APP_ID = APP_ID_;
 	}
@@ -198,6 +232,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 		muonContract = muonContract_;
 	}
 
+	/// @dev it affects buyback and recollateralize functions on DEI minter pool 
 	function toggleUseVirtualReserve() external onlyOwner {
 		useVirtualReserve = !useVirtualReserve;
 	}
