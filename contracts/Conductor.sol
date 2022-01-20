@@ -26,10 +26,11 @@ contract Conductor is Ownable {
 		string memory shortName,
 		string memory shortSymbol,
 		string memory longName,
-		string memory longSymbol
+		string memory longSymbol,
+		string memory version
 	) external {
-		Registrar short = new Registrar(roleChecker, shortName, shortSymbol);
-		Registrar long = new Registrar(roleChecker, longName, longSymbol);
+		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version);
+		Registrar long = new Registrar(roleChecker, longName, longSymbol, version);
     
         emit Conduct(_id, address(short), address(long));
 	}
