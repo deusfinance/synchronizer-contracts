@@ -83,7 +83,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	/// @param expireBlock signature expire time
 	/// @param price synthetic token price
 	/// @param _reqId muon request id
-	/// @param sigs muon network TSS signatures
+	/// @param sigs muon network's TSS signatures
 	function sellFor(
 		address _user,
 		address registrar,
@@ -100,6 +100,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
+		require(amount > 0, "SYNCHRONIZER: amount should be bigger than 0");
 
 		{
             bytes32 hash = keccak256(
@@ -137,14 +138,14 @@ contract Synchronizer is ISynchronizer, Ownable {
 
 	/// @notice buy the synthetic tokens
 	/// @dev SchnorrSign is a TSS structure
-	/// @param _user collateral will be send to the _user
+	/// @param _user synthetic token will be send to the _user
 	/// @param registrar synthetic token address
 	/// @param amount synthetic token amount (decimal is 18)
 	/// @param fee trading fee
 	/// @param expireBlock signature expire time
 	/// @param price synthetic token price
 	/// @param _reqId muon request id
-	/// @param sigs muon network TSS signatures
+	/// @param sigs muon network's TSS signatures
 	function buyFor(
 		address _user,
 		address registrar,
@@ -161,7 +162,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
-		require(amount > 0, "amount should be bigger than 0");
+		require(amount > 0, "SYNCHRONIZER: amount should be bigger than 0");
 
 		{
             bytes32 hash = keccak256(
