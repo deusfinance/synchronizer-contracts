@@ -60,6 +60,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	/// @param collat_usd_price pool's collateral price (is 1e6) (decimal is 6)
 	/// @return amount of collateral in the contract
     function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
+		if (!useVirtualReserve) return 0;
         uint256 collateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
         return (virtualReserve * collateralRatio) / 1e6;
     }

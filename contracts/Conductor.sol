@@ -6,9 +6,10 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IConductor.sol";
 import "./Registrar.sol";
 
-contract Conductor is Ownable {
+contract Conductor is IConductor, Ownable {
 	address public roleChecker;
 
     event Conduct(string _id, address short, address long);
@@ -28,13 +29,13 @@ contract Conductor is Ownable {
 		string memory longName,
 		string memory longSymbol,
 		string memory version
-	) external {
+	) external returns (address, address) {
 		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version);
 		Registrar long = new Registrar(roleChecker, longName, longSymbol, version);
-    
         emit Conduct(_id, address(short), address(long));
-	}
 
+		return (address(short), address(long));
+	}
 }
 
 //Dar panah khoda

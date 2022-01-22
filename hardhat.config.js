@@ -34,14 +34,24 @@ module.exports = {
 				process.env.SYNC_DEPLOYER_PRIVATE_KEY
 			],
 		},
+		rinkeby: {
+			url: `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+			accounts: [
+				process.env.SYNC_DEPLOYER_PRIVATE_KEY
+			],
+			chainId: 4,
+			gas: "auto",
+			gasPrice: "auto",
+			gasMultiplier: 1.2
+		},
    		fantom: {
-			url: "https://rpc.ftm.tools/",
+			url: `https://rpcapi.fantom.network`,
 			accounts: [
 				process.env.SYNC_DEPLOYER_PRIVATE_KEY
 			],
 			chainId: 250,
 			gas: "auto",
-			gasPrice: 300100000000,	//300.1 Gwei
+			gasPrice: 3000100000000,	//800.1 Gwei
 			gasMultiplier: 1.2
 		},
 	},
@@ -86,7 +96,8 @@ module.exports = {
 		timeout: 360000
 	},
 	etherscan: {
-		apiKey: process.env.FANTOM_API_KEY, // FANTOM Mainnet
+		// apiKey: process.env.FANTOM_API_KEY, // FANTOM Mainnet
+		apiKey: process.env.ETHERSCAN_API_KEY // Eth Mainnet
 	},
 	contractSizer: {
 		alphaSort: true,
