@@ -16,6 +16,8 @@ interface ISynchronizer {
     function deiContract() external view returns(address);
     function collatDollarBalance(uint256 collat_usd_price) external view returns (uint256);
 	function getChainID() external view returns (uint256);
+	function getAmountIn(uint256 amountOut, uint256 fee, uint256 price, uint256 action) external view returns (uint256 amountIn);
+	function getAmountOut(uint256 amountIn, uint256 fee, uint256 price, uint256 action) external view returns (uint256 amountOut);
 	function sellFor(
 		address _user,
 		address registrar,

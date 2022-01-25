@@ -75,11 +75,43 @@ contract Synchronizer is ISynchronizer, Ownable {
         return id;
     }
 
-	/// @notice sell the synthetic tokens
+	/// @notice view functions for frontend
+	/// @param amountOut amount that you want at the end
+	/// @param fee trading fee
+	/// @param price synthetic price
+	/// @param action 0 is sell & 1 is buy
+	/// @return amountIn for trading
+	function getAmountIn(uint256 amountOut, uint256 fee, uint256 price, uint256 action) public view returns (uint256 amountIn) {
+		if (action == 0) {  // sell synthetic token
+			amountIn = amountOut * price / scale - fee;  // x = y * (price) * (1 / 1 - fee)
+		} else {  // buy synthetic token
+			amountIn = amountOut * scale * scale / (price * (scale - fee));  // x = y * / (price * (1 - fee))
+		}
+	}
+
+	/// @notice view functions for frontend
+	/// @param amountIn amount that you want sell
+	/// @param fee trading fee
+	/// @param price synthetic price
+	/// @param action 0 is sell & 1 is buy
+	/// @return amountOut for trading
+	function getAmountOut(uint256 amountIn, uint256 fee, uint256 price, uint256 action) public view returns (uint256 amountOut) {
+		if (action == 0) {  // sell synthetic token +
+			uint256 collateralAmount = amountIn * price / scale;
+			uint256 feeAmount = collateralAmount * fee / scale;
+			amountOut = collateralAmount - feeAmount;
+		} else {  // buy synthetic token
+			uint256 feeAmount = amountIn * fee / scale;
+			uint256 collateralAmount = amountIn - feeAmount;
+			amountOut = collateralAmount * scale / price;
+		}
+	}
+
+	/// @notice to sell the synthetic tokens
 	/// @dev SchnorrSign is a TSS structure
 	/// @param _user collateral will be send to the _user
 	/// @param registrar synthetic token address
-	/// @param amount synthetic token amount (decimal is 18)
+	/// @param amountIn synthetic token amount (decimal is 18)
 	/// @param fee trading fee
 	/// @param expireBlock signature expire time
 	/// @param price synthetic token price
@@ -88,7 +120,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	function sellFor(
 		address _user,
 		address registrar,
-		uint256 amount,
+		uint256 amountIn,
 		uint256 fee,
 		uint256 expireBlock,
 		uint256 price,
@@ -122,8 +154,7 @@ contract Synchronizer is ISynchronizer, Ownable {
                 "SYNCHRONIZER: not verified"
             );
         }
-
-		uint256 collateralAmount = amount * price / scale;
+		uint256 collateralAmount = amountIn * price / scale;
 		uint256 feeAmount = collateralAmount * fee / scale;
 
 		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
@@ -137,11 +168,11 @@ contract Synchronizer is ISynchronizer, Ownable {
 		emit Sell(_user, registrar, amount, collateralAmount, feeAmount);
 	}
 
-	/// @notice buy the synthetic tokens
+	/// @notice to buy the synthetic tokens
 	/// @dev SchnorrSign is a TSS structure
 	/// @param _user synthetic token will be send to the _user
 	/// @param registrar synthetic token address
-	/// @param amount synthetic token amount (decimal is 18)
+	/// @param amountIn dei token amount (decimal is 18)
 	/// @param fee trading fee
 	/// @param expireBlock signature expire time
 	/// @param price synthetic token price
@@ -150,7 +181,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 	function buyFor(
 		address _user,
 		address registrar,
-		uint256 amount,
+		uint256 amountIn,
 		uint256 fee,
 		uint256 expireBlock,
 		uint256 price,
@@ -184,17 +215,16 @@ contract Synchronizer is ISynchronizer, Ownable {
                 "SYNCHRONIZER: not verified"
             );
         }
-
-		uint256 collateralAmount = amount * price / scale;
-		uint256 feeAmount = collateralAmount * fee / scale;
+		uint256 feeAmount = amountIn * fee / scale;
+		uint256 collateralAmount = amountIn - feeAmount;
+		uint256 registrarAmount = collateralAmount * scale / price;
 
 		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
 
-		uint256 deiAmount = collateralAmount + feeAmount;
-		IDEIStablecoin(deiContract).pool_burn_from(msg.sender, deiAmount);
+		IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
 		if (useVirtualReserve) virtualReserve -= deiAmount;
 
-		IRegistrar(registrar).mint(_user, amount);
+		IRegistrar(registrar).mint(_user, registrarAmount);
 
 		emit Buy(_user, registrar, amount, collateralAmount, feeAmount);
 	}
