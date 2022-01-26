@@ -41,8 +41,8 @@ contract Synchronizer is ISynchronizer, Ownable {
 	uint8 public APP_ID;  // muon's app id
 	bool public useVirtualReserve;
 
-	event Buy(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
-	event Sell(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
+	event Buy(address user, address registrar, uint256 deiAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
+	event Sell(address user, address registrar, uint256 registrarAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
 	event WithdrawFee(uint256 amount, address recipient);
 
 	constructor (
@@ -133,7 +133,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
-		require(amount > 0, "SYNCHRONIZER: amount should be bigger than 0");
+		require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
 
 		{
             bytes32 hash = keccak256(
@@ -159,13 +159,13 @@ contract Synchronizer is ISynchronizer, Ownable {
 
 		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
 
-		IRegistrar(registrar).burn(msg.sender, amount);
+		IRegistrar(registrar).burn(msg.sender, amountIn);
 
 		uint256 deiAmount = collateralAmount - feeAmount;
 		IDEIStablecoin(deiContract).pool_mint(_user, deiAmount);
 		if (useVirtualReserve) virtualReserve += deiAmount;
 
-		emit Sell(_user, registrar, amount, collateralAmount, feeAmount);
+		emit Sell(_user, registrar, amountIn, price, collateralAmount, feeAmount);
 	}
 
 	/// @notice to buy the synthetic tokens
@@ -194,7 +194,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
-		require(amount > 0, "SYNCHRONIZER: amount should be bigger than 0");
+		require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
 
 		{
             bytes32 hash = keccak256(
@@ -222,11 +222,11 @@ contract Synchronizer is ISynchronizer, Ownable {
 		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
 
 		IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
-		if (useVirtualReserve) virtualReserve -= deiAmount;
+		if (useVirtualReserve) virtualReserve -= amountIn;
 
 		IRegistrar(registrar).mint(_user, registrarAmount);
 
-		emit Buy(_user, registrar, amount, collateralAmount, feeAmount);
+		emit Buy(_user, registrar, amountIn, price, collateralAmount, feeAmount);
 	}
 
 	/// @notice withdraw accumulated trading fee by DAO
