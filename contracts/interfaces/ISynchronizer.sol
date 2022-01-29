@@ -7,8 +7,12 @@ import "./IMuonV02.sol";
 interface ISynchronizer {
 
     function muonContract() external view returns(address);
+	function spiritSwapDao() external view returns(address);
+	function deusDao() external view returns(address);
     function minimumRequiredSignature() external view returns(uint256);
     function scale() external view returns(uint256);
+	function spiritSwapDaoShare() external view returns(uint256);
+	function deusDaoShare() external view returns(uint256);
     function withdrawableFeeAmount() external view returns(uint256);
     function virtualReserve() external view returns(uint256);
     function APP_ID() external view returns(uint8);
@@ -38,9 +42,12 @@ interface ISynchronizer {
 		bytes calldata _reqId,
 		SchnorrSign[] calldata sigs
 	) external;
-	function withdrawFee(uint256 amount_, address recipient_) external;
-	function setMinimumRequiredSignature(uint256 _minimumRequiredSignature) external;
+	function withdrawFee() external;
+	function setMinimumRequiredSignature(uint256 minimumRequiredSignature_) external;
 	function setScale(uint scale_) external;
+	function setDeusDao(address deusDao_) external;
+    function setSpiritSwapDao(address spiritSwapDao_) external;
+    function setShares(uint256 deusDaoShare_, uint256 spiritSwapShare_) external;
 	function setAppId(uint8 APP_ID_) external;
 	function setvirtualReserve(uint256 virtualReserve_) external;
 	function setMuonContract(address muonContract_) external;
