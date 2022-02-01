@@ -6,8 +6,9 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IRoleChecker.sol";
 
-contract RoleChecker is Ownable {
+contract RoleChecker is IRoleChecker, Ownable {
     mapping(address => bool) private hasRole;
 
     constructor () {}

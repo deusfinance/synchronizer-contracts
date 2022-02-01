@@ -23,6 +23,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/ISynchronizer.sol";
 import "./interfaces/IDEIStablecoin.sol";
 import "./interfaces/IRegistrar.sol";
+import "./interfaces/IPartnerManager.sol";
 
 
 /// @title Synchronizer
@@ -34,34 +35,29 @@ contract Synchronizer is ISynchronizer, Ownable {
     // variables
     address public muonContract;  // address of muon verifier contract
     address public deiContract;  // address of dei token
-    address public spiritSwapDao;
-    address public deusDao;
+    address public partnerManager;  // address of partner manager contract
     uint256 public minimumRequiredSignature;  // number of signatures that required
     uint256 public scale = 1e18;  // used for math
-    uint256 public spiritSwapDaoShare = 2e18;  // spirit swap dao share
-    uint256 public deusDaoShare = 1e18;  // deus dao share
-    uint256 public withdrawableFeeAmount;  // trading fee amount
-    uint256 public virtualReserve;
-    uint8 public APP_ID;  // muon's app id
-    bool public useVirtualReserve;
-
-    event Buy(address user, address registrar, uint256 deiAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
-    event Sell(address user, address registrar, uint256 registrarAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
-    event ShareSet(uint256 deusDaoShare, uint256 spiritSwapShare);
-    event WithdrawFee(uint256 deusShare, uint256 spiritswapShare);
+    mapping(address => uint256) public trades;  // partner address => trading volume
+    uint256 public virtualReserve;  // used for collatDollarBalance()
+    uint8 public appID;  // muon's app id
+    bool public useVirtualReserve;  // to change collatDollarBalance() return amount
 
     constructor (
+        address deiContract_,
+        address muonContract_,
+        address partnerManager_,
         uint256 minimumRequiredSignature_,
         uint256 virtualReserve_,
-        address collateralToken_,
-        address spiritSwapDao_,
-        address deusDao_
+        uint8 appID_
+
     ) {
+        deiContract = deiContract_;
+        muonContract = muonContract_;
+        partnerManager = partnerManager_;
         minimumRequiredSignature = minimumRequiredSignature_;
         virtualReserve = virtualReserve_;
-        deiContract = collateralToken_;
-        spiritSwapDao = spiritSwapDao_;
-        deusDao = deusDao_;
+        appID = appID_;
     }
 
     /// @notice This function use pool feature to manage buyback and recollateralize on DEI minter pool
@@ -71,7 +67,7 @@ contract Synchronizer is ISynchronizer, Ownable {
     function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
         if (!useVirtualReserve) return 0;
         uint256 collateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
-        return (virtualReserve * collateralRatio) / 1e6;
+        return (virtualReserve * collat_usd_price * collateralRatio) / 1e12;
     }
 
     /// @notice used for trade signatures
@@ -86,11 +82,13 @@ contract Synchronizer is ISynchronizer, Ownable {
 
     /// @notice view functions for frontend
     /// @param amountOut amount that you want at the end
-    /// @param fee trading fee
+    /// @param partnerID address of partner
+    /// @param registrar synthetic token address
     /// @param price synthetic price
     /// @param action 0 is sell & 1 is buy
     /// @return amountIn for trading
-    function getAmountIn(uint256 amountOut, uint256 fee, uint256 price, uint256 action) public view returns (uint256 amountIn) {
+    function getAmountIn(address partnerID, address registrar, uint256 amountOut, uint256 price, uint256 action) public view returns (uint256 amountIn) {
+        uint256 fee = IPartnerManager(partnerManager).partnerTradingFee(partnerID, IRegistrar(registrar).registrarType());
         if (action == 0) {  // sell synthetic token
             amountIn = amountOut * price / scale - fee;  // x = y * (price) * (1 / 1 - fee)
         } else {  // buy synthetic token
@@ -100,11 +98,13 @@ contract Synchronizer is ISynchronizer, Ownable {
 
     /// @notice view functions for frontend
     /// @param amountIn amount that you want sell
-    /// @param fee trading fee
+    /// @param partnerID address of partner
+    /// @param registrar synthetic token address
     /// @param price synthetic price
     /// @param action 0 is sell & 1 is buy
     /// @return amountOut for trading
-    function getAmountOut(uint256 amountIn, uint256 fee, uint256 price, uint256 action) public view returns (uint256 amountOut) {
+    function getAmountOut(address partnerID, address registrar, uint256 amountIn, uint256 price, uint256 action) public view returns (uint256 amountOut) {
+        uint256 fee = IPartnerManager(partnerManager).partnerTradingFee(partnerID, IRegistrar(registrar).registrarType());
         if (action == 0) {  // sell synthetic token +
             uint256 collateralAmount = amountIn * price / scale;
             uint256 feeAmount = collateralAmount * fee / scale;
@@ -118,19 +118,19 @@ contract Synchronizer is ISynchronizer, Ownable {
 
     /// @notice to sell the synthetic tokens
     /// @dev SchnorrSign is a TSS structure
+    /// @param partnerID partner address
     /// @param _user collateral will be send to the _user
     /// @param registrar synthetic token address
     /// @param amountIn synthetic token amount (decimal is 18)
-    /// @param fee trading fee
     /// @param expireBlock signature expire time
     /// @param price synthetic token price
     /// @param _reqId muon request id
     /// @param sigs muon network's TSS signatures
     function sellFor(
+        address partnerID,
         address _user,
         address registrar,
         uint256 amountIn,
-        uint256 fee,
         uint256 expireBlock,
         uint256 price,
         bytes calldata _reqId,
@@ -138,11 +138,14 @@ contract Synchronizer is ISynchronizer, Ownable {
     )
         external
     {
+        require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
+        require(IPartnerManager(partnerManager).isPartner(partnerID), "SYNCHRONIZER: invalid partnerID");
         require(
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
-        require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
+
+        uint256 fee = IPartnerManager(partnerManager).partnerTradingFee(partnerID, IRegistrar(registrar).registrarType());
 
         {
             bytes32 hash = keccak256(
@@ -153,7 +156,7 @@ contract Synchronizer is ISynchronizer, Ownable {
                     expireBlock, 
                     uint256(0),
                     getChainID(),
-                    APP_ID
+                    appID
                 )
             );
 
@@ -166,7 +169,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 collateralAmount = amountIn * price / scale;
         uint256 feeAmount = collateralAmount * fee / scale;
 
-        withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
+        trades[partnerID] += feeAmount;
 
         IRegistrar(registrar).burn(msg.sender, amountIn);
 
@@ -174,24 +177,24 @@ contract Synchronizer is ISynchronizer, Ownable {
         IDEIStablecoin(deiContract).pool_mint(_user, deiAmount);
         if (useVirtualReserve) virtualReserve += deiAmount;
 
-        emit Sell(_user, registrar, amountIn, price, collateralAmount, feeAmount);
+        emit Sell(partnerID, _user, registrar, amountIn, price, collateralAmount, feeAmount);
     }
 
     /// @notice to buy the synthetic tokens
     /// @dev SchnorrSign is a TSS structure
+    /// @param partnerID partner address
     /// @param _user synthetic token will be send to the _user
     /// @param registrar synthetic token address
     /// @param amountIn dei token amount (decimal is 18)
-    /// @param fee trading fee
     /// @param expireBlock signature expire time
     /// @param price synthetic token price
     /// @param _reqId muon request id
     /// @param sigs muon network's TSS signatures
     function buyFor(
+        address partnerID,
         address _user,
         address registrar,
         uint256 amountIn,
-        uint256 fee,
         uint256 expireBlock,
         uint256 price,
         bytes calldata _reqId,
@@ -199,11 +202,14 @@ contract Synchronizer is ISynchronizer, Ownable {
     )
         external
     {
+        require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
+        require(IPartnerManager(partnerManager).isPartner(partnerID), "SYNCHRONIZER: invalid partnerID");
         require(
             sigs.length >= minimumRequiredSignature,
             "SYNCHRONIZER: insufficient number of signatures"
         );
-        require(amountIn > 0, "SYNCHRONIZER: amount should be bigger than 0");
+
+        uint256 fee = IPartnerManager(partnerManager).partnerTradingFee(partnerID, IRegistrar(registrar).registrarType());
 
         {
             bytes32 hash = keccak256(
@@ -214,7 +220,7 @@ contract Synchronizer is ISynchronizer, Ownable {
                     expireBlock, 
                     uint256(1),
                     getChainID(),
-                    APP_ID
+                    appID
                 )
             );
 
@@ -224,82 +230,62 @@ contract Synchronizer is ISynchronizer, Ownable {
                 "SYNCHRONIZER: not verified"
             );
         }
+
         uint256 feeAmount = amountIn * fee / scale;
         uint256 collateralAmount = amountIn - feeAmount;
-        uint256 registrarAmount = collateralAmount * scale / price;
 
-        withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
+        trades[partnerID] += feeAmount;
 
         IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
         if (useVirtualReserve) virtualReserve -= amountIn;
 
+        uint256 registrarAmount = collateralAmount * scale / price;
         IRegistrar(registrar).mint(_user, registrarAmount);
 
-        emit Buy(_user, registrar, amountIn, price, collateralAmount, feeAmount);
+        emit Buy(partnerID, _user, registrar, amountIn, price, collateralAmount, feeAmount);
     }
 
-    /// @notice withdraw accumulated trading fee by DAO
+    /// @notice withdraw accumulated trading fee
     /// @dev fee will be minted in DEI
-    function withdrawFee() external onlyOwner {
-        uint256 deusDaoAmount = withdrawableFeeAmount * deusDaoShare / (deusDaoShare + spiritSwapDaoShare);
-        uint256 spiritSwapDaoAmount = withdrawableFeeAmount * spiritSwapDaoShare / (deusDaoShare + spiritSwapDaoShare);
-        IDEIStablecoin(deiContract).pool_mint(deusDao, deusDaoAmount);
-        IDEIStablecoin(deiContract).pool_mint(spiritSwapDao, spiritSwapDaoAmount);
-        withdrawableFeeAmount = 0;
-        emit WithdrawFee(deusDaoAmount, spiritSwapDaoAmount);
+    function withdrawFee() external {
+        require(trades[msg.sender] > 0, "SYNCHRONIZER: fee is zero");
+        uint256 partnerFee = trades[msg.sender] * IPartnerManager(partnerManager).partnerShare(msg.sender) / scale;
+        uint256 platformFee = trades[msg.sender] - partnerFee;
+        IDEIStablecoin(deiContract).pool_mint(msg.sender, partnerFee);
+        IDEIStablecoin(deiContract).pool_mint(IPartnerManager(partnerManager).platform(), platformFee);
+        trades[msg.sender] = 0;
+        emit WithdrawFee(msg.sender, partnerFee, platformFee);
     }
 
     /// @notice changes minimum required signatures in trading functions by DAO
     /// @param minimumRequiredSignature_ number of required signatures
     function setMinimumRequiredSignature(uint256 minimumRequiredSignature_) external onlyOwner {
+        emit MinimumRequiredSignatureSet(minimumRequiredSignature, minimumRequiredSignature_);
         minimumRequiredSignature = minimumRequiredSignature_;
-    }
-
-    function setScale(uint scale_) external onlyOwner {
-        scale = scale_;
-    }
-
-    /// @notice changes deus dao
-    /// @param deusDao_ new dao address
-    function setDeusDao(address deusDao_) external {
-        require(deusDao == msg.sender, "SYNCHRONIZER: Caller is not deus dao");
-        deusDao = deusDao_;
-    }
-
-    /// @notice changes spirit swap dao
-    /// @param spiritSwapDao_ new dao address
-    function setSpiritSwapDao(address spiritSwapDao_) external {
-        require(spiritSwapDao == msg.sender, "SYNCHRONIZER: Caller is not spiritswap dao");
-        spiritSwapDao = spiritSwapDao_;
-    }
-
-    /// @notice to change shares
-    /// @param deusDaoShare_ new share of deus dao
-    /// @param spiritSwapShare_ new share of spiritswap dao
-    function setShares(uint256 deusDaoShare_, uint256 spiritSwapShare_) external onlyOwner {
-        deusDaoShare = deusDaoShare_;
-        spiritSwapDaoShare = spiritSwapShare_;
-        emit ShareSet(deusDaoShare_, spiritSwapShare_);        
     }
 
     /// @notice changes muon's app id by DAO
     /// @dev each app becomes different from others by app id
-    /// @param APP_ID_ muon's app id
-    function setAppId(uint8 APP_ID_) external onlyOwner {
-        APP_ID = APP_ID_;
+    /// @param appID_ muon's app id
+    function setAppId(uint8 appID_) external onlyOwner {
+        emit AppIdSet(appID, appID_);
+        appID = appID_;
     }
 
-    function setvirtualReserve(uint256 virtualReserve_) external onlyOwner {
+    function setVirtualReserve(uint256 virtualReserve_) external onlyOwner {
+        emit VirtualReserveSet(virtualReserve, virtualReserve_);
         virtualReserve = virtualReserve_;
     }
 
     function setMuonContract(address muonContract_) external onlyOwner {
+        emit MuonContractSet(muonContract, muonContract_);
         muonContract = muonContract_;
     }
-
+    
     /// @dev it affects buyback and recollateralize functions on DEI minter pool 
     function toggleUseVirtualReserve() external onlyOwner {
         useVirtualReserve = !useVirtualReserve;
+        emit UseVirtualReserveToggled(useVirtualReserve);
     }
 }
 

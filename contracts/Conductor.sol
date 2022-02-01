@@ -28,10 +28,11 @@ contract Conductor is IConductor, Ownable {
 		string memory shortSymbol,
 		string memory longName,
 		string memory longSymbol,
-		string memory version
+		string memory version,
+		uint256 registrarType
 	) external returns (address, address) {
-		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version);
-		Registrar long = new Registrar(roleChecker, longName, longSymbol, version);
+		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version, registrarType);
+		Registrar long = new Registrar(roleChecker, longName, longSymbol, version, registrarType);
         emit Conduct(_id, address(short), address(long));
 
 		return (address(short), address(long));

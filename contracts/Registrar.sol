@@ -13,10 +13,12 @@ contract Registrar is dERC20, Ownable {
 
 	address public roleChecker;
 	string public version;
+	uint256 public registrarType;
 
-	constructor(address roleChecker_, string memory name, string memory symbol, string memory version_) dERC20(name, symbol) {
+	constructor(address roleChecker_, string memory name, string memory symbol, string memory version_, uint256 registrarType_) dERC20(name, symbol) {
 		roleChecker = roleChecker_;
 		version = version_;
+		registrarType = registrarType_;
 	}
 
 	modifier hasRole(address user) {

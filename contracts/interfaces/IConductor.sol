@@ -10,6 +10,7 @@ interface IConductor {
 		string memory shortSymbol,
 		string memory longName,
 		string memory longSymbol,
-		string memory version
+		string memory version,
+		uint256 registrarType
 	) external returns (address, address);
 }
