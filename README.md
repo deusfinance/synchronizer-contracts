@@ -2,6 +2,10 @@
 
 Deus ecosystem synthetic tokens' market maker
 
+<p align="center">
+  <img width="200" height="200" src="https://legacy.deus.finance/tokens/sync5.png">
+</p>
+
 ### Pre Requisites
 
 You will need the following software on your machine:
