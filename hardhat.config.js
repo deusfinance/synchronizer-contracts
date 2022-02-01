@@ -96,8 +96,8 @@ module.exports = {
 		timeout: 360000
 	},
 	etherscan: {
-		apiKey: process.env.FANTOM_API_KEY, // FANTOM Mainnet
-		// apiKey: process.env.ETHERSCAN_API_KEY // Eth Mainnet
+		// apiKey: process.env.FANTOM_API_KEY, // FANTOM Mainnet
+		apiKey: process.env.ETHERSCAN_API_KEY // Eth Mainnet
 	},
 	contractSizer: {
 		alphaSort: true,

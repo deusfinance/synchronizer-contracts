@@ -2,42 +2,68 @@ const deploySynchronizer = require('./deploy_contracts/deploy_sync.js');
 const deployConductor = require('./deploy_contracts/deploy_conductor.js');
 const deployRoleChecker = require('./deploy_contracts/deploy_role_checker.js');
 const deployRegistrar = require('./deploy_contracts/deploy_registrar.js');
-
+const deployPartnerManager = require('./deploy_contracts/deploy_partner_manager.js');
 const { verifyAll } = require('./helpers/deploy_contract.js');
 
 async function main() {
 
-    const synchronizer = await deploySynchronizer();
+    // configuration
+    const deiAddress = '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3';
+    const muonAddress = '0xE4F8d9A30936a6F8b17a73dC6fEb51a3BBABD51A';
+    const platform = '0xE5227F141575DcE74721f4A9bE2D7D636F923044';
+    const minimumRequiredSignature = '1';
+    const virtualReserve = '5000000000000000000000000';
+    const appID = '9';
+    const minimumRegistrarFee = ['10000000000000000', '100000000000000000', '3000000000000000'];
 
-    // await new Promise((resolve) => setTimeout(resolve, 30000));
-    // const roleChecker = await deployRoleChecker();
+    const partnerManager = await deployPartnerManager({
+        platform: platform,
+        minimumRegistrarFee: minimumRegistrarFee
+    });
 
-    const roleCheckerInstance = await hre.ethers.getContractFactory("RoleChecker");
-    const roleChecker = await roleCheckerInstance.attach("0xbF0ab1104B70BBE64c767f7BBc45D178Add4Fd9c");
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+    const synchronizer = await deploySynchronizer({ 
+        deiAddress: deiAddress, 
+        muonAddress: muonAddress, 
+        partnerManagerAddress: partnerManager.address, 
+        minimumRequiredSignature: minimumRequiredSignature,
+        virtualReserve: virtualReserve, 
+        appID: appID 
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+    const roleChecker = await deployRoleChecker();
 
     await new Promise((resolve) => setTimeout(resolve, 30000));
     await roleChecker.grant(synchronizer.address);
 
     await new Promise((resolve) => setTimeout(resolve, 30000));
-    await roleChecker.revoke("0x85F727F68B551CC0757e4ceCf62363b0deECA249");
-    // await new Promise((resolve) => setTimeout(resolve, 30000));
-    // const conductor = await deployConductor({ 
-    //     roleChecker: roleChecker.address
-    // });
+    const conductor = await deployConductor({ 
+        roleChecker: roleChecker.address
+    });
 
-    // const conductorInstance = await hre.ethers.getContractFactory("Conductor");
-    // const conductor = await conductorInstance.attach("0xF7F3280073965e8dfB0b41c8567A5CE59E6bA998");
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+    await conductor.adminConduct("BTC", "Bitcoin reverse synth", "rBTC", "Bitcoin synth", "dBTC", "v1.0", "1");
 
-    // await conductor.adminConduct("TSLA", "Test Tesla short DEUS synthetic", "dTSLA-S", "Test Tesla long DEUS synthetic", "dTSLA", "v1.0.0_beta");    
-    // await conductor.adminConduct("BTC", "Test Bitcoin short DEUS synthetic", "dBTC-S", "Test Bitcoin long DEUS synthetic", "dBTC", "v1.0.0_beta")
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+    await deployRegistrar({
+        roleChecker: roleChecker.address,
+        name: 'Verified Synthetic token',
+        symbol: 'VST',
+        version: 'v1.0.0',
+        type: '0'
+    })
 
-    // await new Promise((resolve) => setTimeout(resolve, 30000));
-    // await deployRegistrar({
-    //     roleChecker: "0xbF0ab1104B70BBE64c767f7BBc45D178Add4Fd9c",
-    //     name: "dBitcoin",
-    //     symbol: "BTC-L",
-    //     version: "v1.0.0"
-    // })
+    console.log(deployedContracts);
+    for (let i = 0; i < deployedContracts.length; i++) {
+        let contract = deployedContracts[i];
+        console.log("verifing", contract['address']);
+        try {
+            await hre.run('verify:verify', contract);
+        } catch (error) {
+            console.log(error);
+        }
+    }
 
     await verifyAll();
 }

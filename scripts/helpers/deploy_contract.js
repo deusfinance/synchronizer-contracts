@@ -22,7 +22,11 @@ module.exports = {
         for(let i = 0;i < deployedContracts.length;i++){
             let contract = deployedContracts[i];
             console.log("verifing", contract['address']);
-            await hre.run('verify:verify', contract);
+            try {
+                await hre.run('verify:verify', contract);
+            } catch (error) {
+                console.log(error);
+            }
         }
         deployedContracts = [];
     }
