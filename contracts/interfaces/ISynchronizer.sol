@@ -8,7 +8,7 @@ interface ISynchronizer {
 
     event Buy(address partnerID, address user, address registrar, uint256 deiAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
     event Sell(address partnerID, address user, address registrar, uint256 registrarAmount, uint256 price, uint256 collateralAmount, uint256 feeAmount);
-    event WithdrawFee(address platform, uint256 partnerFee, uint256 platformFee);
+    event WithdrawFee(address platform, uint256 partnerFee, uint256 platformFee, uint256 registrarType);
     event MinimumRequiredSignatureSet(uint256 oldValue, uint256 newValue);
     event AppIdSet(uint8 oldID, uint8 newID);
     event VirtualReserveSet(uint256 oldReserve, uint256 newReserve);
@@ -19,7 +19,7 @@ interface ISynchronizer {
     function deiContract() external view returns (address);
     function minimumRequiredSignature() external view returns (uint256);
     function scale() external view returns (uint256);
-    function trades(address partner) external view returns (uint256);
+    function trades(address partner, uint256 registrarType) external view returns (uint256);
     function virtualReserve() external view returns (uint256);
     function appID() external view returns (uint8);
     function useVirtualReserve() external view returns (bool);
@@ -62,7 +62,7 @@ interface ISynchronizer {
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
     ) external;
-    function withdrawFee() external;
+    function withdrawFee(address recv, uint256 registrarType) external;
     function setMinimumRequiredSignature(uint256 minimumRequiredSignature_) external;
     function setAppId(uint8 appID_) external;
     function setVirtualReserve(uint256 virtualReserve_) external;

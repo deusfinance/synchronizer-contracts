@@ -21,21 +21,21 @@ contract Registrar is dERC20, Ownable {
 		registrarType = registrarType_;
 	}
 
-	modifier hasRole(address user) {
-		require(IRoleChecker(roleChecker).verify(user), "Caller doesnt have role");
+	modifier hasRole {
+		require(IRoleChecker(roleChecker).verify(msg.sender), "Caller doesnt have role");
 		_;
 	}
 
-	function rename(string memory name, string memory symbol) external hasRole(msg.sender) {
+	function rename(string memory name, string memory symbol) external hasRole {
 		_name = name;
 		_symbol = symbol;
 	}
 
-	function mint(address to, uint256 amount) external hasRole(msg.sender) {
+	function mint(address to, uint256 amount) external hasRole {
         _mint(to, amount);
     }
 
-	function burn(address from, uint256 amount) external hasRole(msg.sender) {
+	function burn(address from, uint256 amount) external hasRole {
         _burn(from, amount);
     }
 

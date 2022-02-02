@@ -15,6 +15,7 @@
 
 // Primary Author(s)
 // Vahid: https://github.com/vahid-dev
+// M.R.M: https://github.com/mrmousavi78
 
 pragma solidity ^0.8.11;
 
@@ -24,38 +25,37 @@ import "./interfaces/IPartnerManager.sol";
 /// @author deus.finance
 /// @notice synchronizer's partner manager
 contract PartnerManager is IPartnerManager {
+
+    uint256[3] public platformFee; // platform trading fee
+    mapping(address => uint256[3]) public partnerFee; // partner address => PartnerFee (e.g. 1e18 = 100%)
     address public platform; // platform multisig address
-    uint256[] public minimumRegistrarFee; // platform minimum trading fee
     uint256 public scale = 1e18; // used for math
     mapping(address => bool) public isPartner; // partnership of address
-    mapping(address => uint256) public partnerShare; // parner's share (e.g. 1e18 = 100%)
-    mapping(address => uint256[]) public partnerTradingFee; // partner address => registrar fee list (e.g. 1e18 = 100%)s
 
-    constructor(address platform_, uint256[] memory minimumRegistrarFee_) {
+    constructor(address platform_, uint256[3] memory platformFee_) {
         platform = platform_;
-        minimumRegistrarFee = minimumRegistrarFee_;
+        platformFee = platformFee_;
     }
 
     /// @notice to add partner
     /// @param owner address of partner multisig
-    /// @param share share of partner
-    /// @param registrarTradingFee fee os registrar type (e.g. 0: stock, 1: crypto, 2: forex)
+    /// @param stockFee stock's fee (e.g. 1e18 = 100%)
+    /// @param cryptoFee crypto's fee (e.g. 1e18 = 100%)
+    /// @param forexFee forex's fee (e.g. 1e18 = 100%)
     function addPartner(
         address owner,
-        uint256 share,
-        uint256[] memory registrarTradingFee
+        uint256 stockFee,
+        uint256 cryptoFee,
+        uint256 forexFee
     ) external {
         require(!isPartner[owner], "SYNCHRONIZER: partner has been set");
-        for (uint256 i = 0; i < minimumRegistrarFee.length; i++) {
-            require(
-                registrarTradingFee[i] - ((share * registrarTradingFee[i]) / scale) >= minimumRegistrarFee[i],
-                "SYNCHRONIZER: invalid registrar fee"
-            );
-        }
+        require(stockFee >= platformFee[0], "SYNCHRONIZER: stock fee should be greater than or equal platform fee");
+        require(cryptoFee >= platformFee[1], "SYNCHRONIZER: crypto fee should be greater than or equal platform fee");
+        require(forexFee >= platformFee[2], "SYNCHRONIZER: forex fee should be greater than or equal platform fee");
+
         isPartner[owner] = true;
-        partnerShare[owner] = share;
-        partnerTradingFee[owner] = registrarTradingFee;
-        emit PartnerAdded(owner, share, registrarTradingFee);
+        partnerFee[owner] = [stockFee, cryptoFee, forexFee];
+        emit PartnerAdded(owner, partnerFee[owner]);
     }
 }
 //Dar panah khoda

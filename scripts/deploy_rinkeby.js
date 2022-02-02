@@ -14,7 +14,7 @@ async function main() {
     const minimumRequiredSignature = '1';
     const virtualReserve = '5000000000000000000000000';
     const appID = '9';
-    const minimumRegistrarFee = ['10000000000000000', '100000000000000000', '3000000000000000'];
+    const minimumRegistrarFee = ['1000000000000000', '10000000000000000', '300000000000000'];
 
     const partnerManager = await deployPartnerManager({
         platform: platform,
@@ -45,25 +45,14 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 30000));
     await conductor.adminConduct("BTC", "Bitcoin reverse synth", "rBTC", "Bitcoin synth", "dBTC", "v1.0", "1");
 
-    await new Promise((resolve) => setTimeout(resolve, 30000));
-    await deployRegistrar({
-        roleChecker: roleChecker.address,
-        name: 'Verified Synthetic token',
-        symbol: 'VST',
-        version: 'v1.0.0',
-        type: '0'
-    })
-
-    console.log(deployedContracts);
-    for (let i = 0; i < deployedContracts.length; i++) {
-        let contract = deployedContracts[i];
-        console.log("verifing", contract['address']);
-        try {
-            await hre.run('verify:verify', contract);
-        } catch (error) {
-            console.log(error);
-        }
-    }
+    // await new Promise((resolve) => setTimeout(resolve, 30000));
+    // await deployRegistrar({
+    //     roleChecker: roleChecker.address,
+    //     name: 'Verified Synthetic token',
+    //     symbol: 'VST',
+    //     version: 'v1.0.0',
+    //     type: '0'
+    // })
 
     await verifyAll();
 }
