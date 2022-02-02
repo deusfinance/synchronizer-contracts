@@ -24,6 +24,7 @@ import "./interfaces/ISynchronizer.sol";
 import "./interfaces/IDEIStablecoin.sol";
 import "./interfaces/IRegistrar.sol";
 import "./interfaces/IPartnerManager.sol";
+import "hardhat/console";
 
 /// @title Synchronizer
 /// @author deus.finance
@@ -251,6 +252,8 @@ contract Synchronizer is ISynchronizer, Ownable {
             IRegistrar(registrar).registrarType()
         );
 
+        console.log("salam1");
+        console.log(getChainID());
         {
             bytes32 hash = keccak256(
                 abi.encodePacked(
@@ -275,7 +278,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 collateralAmount = amountIn - feeAmount;
 
         trades[partnerID][IRegistrar(registrar).registrarType()] += feeAmount;
-
+        console.log("salam");
         IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
         if (useVirtualReserve) virtualReserve -= amountIn;
 

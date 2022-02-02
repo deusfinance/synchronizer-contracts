@@ -9,3 +9,5 @@ artifacts
 # IDE files
 .idea/
 .code/
+
+package-lock.json
