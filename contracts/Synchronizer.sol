@@ -96,10 +96,12 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountIn) {
-        uint256 fee = IPartnerManager(partnerManager).partnerFee(
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
             partnerID,
             IRegistrar(registrar).registrarType()
         );
+        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+        uint256 fee = partnerFee + platformFee;
         if (action == 0) {
             // sell synthetic token
             amountIn = (amountOut * price) / scale - fee; // x = y * (price) * (1 / 1 - fee)
@@ -123,10 +125,12 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountOut) {
-        uint256 fee = IPartnerManager(partnerManager).partnerFee(
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
             partnerID,
             IRegistrar(registrar).registrarType()
         );
+        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+        uint256 fee = partnerFee + platformFee;
         if (action == 0) {
             // sell synthetic token +
             uint256 collateralAmount = (amountIn * price) / scale;
@@ -170,10 +174,15 @@ contract Synchronizer is ISynchronizer, Ownable {
             "SYNCHRONIZER: insufficient number of signatures"
         );
 
-        uint256 fee = IPartnerManager(partnerManager).partnerFee(
-            partnerID,
-            IRegistrar(registrar).registrarType()
-        );
+        uint256 fee;
+        {
+            uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
+                partnerID,
+                IRegistrar(registrar).registrarType()
+            );
+            uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+            fee = partnerFee + platformFee;
+        }
 
         {
             bytes32 hash = keccak256(
@@ -246,10 +255,15 @@ contract Synchronizer is ISynchronizer, Ownable {
             "SYNCHRONIZER: insufficient number of signatures"
         );
 
-        uint256 fee = IPartnerManager(partnerManager).partnerFee(
-            partnerID,
-            IRegistrar(registrar).registrarType()
-        );
+        uint256 fee;
+        {
+            uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
+                partnerID,
+                IRegistrar(registrar).registrarType()
+            );
+            uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+            fee = partnerFee + platformFee;
+        }
 
         {
             bytes32 hash = keccak256(

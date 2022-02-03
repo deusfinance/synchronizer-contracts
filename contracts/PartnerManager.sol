@@ -49,10 +49,10 @@ contract PartnerManager is IPartnerManager {
         uint256 forexFee
     ) external {
         require(!isPartner[owner], "SYNCHRONIZER: partner has been set");
-        require(stockFee >= platformFee[0], "SYNCHRONIZER: stock fee should be greater than or equal platform fee");
-        require(cryptoFee >= platformFee[1], "SYNCHRONIZER: crypto fee should be greater than or equal platform fee");
-        require(forexFee >= platformFee[2], "SYNCHRONIZER: forex fee should be greater than or equal platform fee");
-
+        require(stockFee <= scale - platformFee[0] &&
+                cryptoFee <= scale - platformFee[1] &&
+                forexFee <= scale - platformFee[2],
+                "SYNCHRONIZER: you can not set fee over 100%");
         isPartner[owner] = true;
         partnerFee[owner] = [stockFee, cryptoFee, forexFee];
         emit PartnerAdded(owner, partnerFee[owner]);
