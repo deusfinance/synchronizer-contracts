@@ -48,11 +48,11 @@ contract PartnerManager is IPartnerManager {
         uint256 cryptoFee,
         uint256 forexFee
     ) external {
-        require(!isPartner[owner], "SYNCHRONIZER: partner has been set");
-        require(stockFee <= scale - platformFee[0] &&
-                cryptoFee <= scale - platformFee[1] &&
-                forexFee <= scale - platformFee[2],
-                "SYNCHRONIZER: you can not set fee over 100%");
+        require(!isPartner[owner], "PARTNER_MANAGER: partner has been set");
+        require(stockFee < scale - platformFee[0] &&
+                cryptoFee < scale - platformFee[1] &&
+                forexFee < scale - platformFee[2],
+                "PARTNER_MANAGER: the total fee can not be GTE 100%");
         isPartner[owner] = true;
         partnerFee[owner] = [stockFee, cryptoFee, forexFee];
         emit PartnerAdded(owner, partnerFee[owner]);

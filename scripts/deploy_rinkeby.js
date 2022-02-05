@@ -21,6 +21,8 @@ async function main() {
         minimumRegistrarFee: minimumRegistrarFee
     });
 
+    await partnerManager.addPartner('0x1164fe7a76D22EAA66f6A0aDcE3E3a30d9957A5f', '2000000000000000', '1000000000000000', '200000000000000');
+
     await new Promise((resolve) => setTimeout(resolve, 30000));
     const synchronizer = await deploySynchronizer({ 
         deiAddress: deiAddress, 

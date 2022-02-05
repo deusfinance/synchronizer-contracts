@@ -82,6 +82,15 @@ contract Synchronizer is ISynchronizer, Ownable {
         return id;
     }
 
+    function _getTotalFee(address partnerID, address registrar) internal view returns (uint256 fee) {
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
+            partnerID,
+            IRegistrar(registrar).registrarType()
+        );
+        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+        fee = partnerFee + platformFee;
+    }
+
     /// @notice view functions for frontend
     /// @param amountOut amount that you want at the end
     /// @param partnerID address of partner
@@ -96,12 +105,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountIn) {
-        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
-            partnerID,
-            IRegistrar(registrar).registrarType()
-        );
-        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
-        uint256 fee = partnerFee + platformFee;
+        uint256 fee = _getTotalFee(partnerID, registrar);
         if (action == 0) {
             // sell synthetic token
             amountIn = (amountOut * price) / scale - fee; // x = y * (price) * (1 / 1 - fee)
@@ -125,12 +129,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountOut) {
-        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
-            partnerID,
-            IRegistrar(registrar).registrarType()
-        );
-        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
-        uint256 fee = partnerFee + platformFee;
+        uint256 fee = _getTotalFee(partnerID, registrar);
         if (action == 0) {
             // sell synthetic token +
             uint256 collateralAmount = (amountIn * price) / scale;
@@ -174,15 +173,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             "SYNCHRONIZER: insufficient number of signatures"
         );
 
-        uint256 fee;
-        {
-            uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
-                partnerID,
-                IRegistrar(registrar).registrarType()
-            );
-            uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
-            fee = partnerFee + platformFee;
-        }
+        uint256 fee = _getTotalFee(partnerID, registrar);
 
         {
             bytes32 hash = keccak256(
@@ -255,15 +246,7 @@ contract Synchronizer is ISynchronizer, Ownable {
             "SYNCHRONIZER: insufficient number of signatures"
         );
 
-        uint256 fee;
-        {
-            uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
-                partnerID,
-                IRegistrar(registrar).registrarType()
-            );
-            uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
-            fee = partnerFee + platformFee;
-        }
+        uint256 fee = _getTotalFee(partnerID, registrar);
 
         {
             bytes32 hash = keccak256(
