@@ -9,7 +9,7 @@ async function main() {
 
     // configuration
     const deiAddress = '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3';
-    const muonAddress = '0xE4F8d9A30936a6F8b17a73dC6fEb51a3BBABD51A';
+    const muonAddress = '0xeE67E903d322FA65d8D370dE4eD99Fd9C3C5EF54'; // muon testnet
     const platform = '0xE5227F141575DcE74721f4A9bE2D7D636F923044';
     const minimumRequiredSignature = '1';
     const virtualReserve = '5000000000000000000000000';

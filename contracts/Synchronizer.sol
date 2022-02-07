@@ -180,7 +180,6 @@ contract Synchronizer is ISynchronizer, Ownable {
                 abi.encodePacked(
                     registrar,
                     price,
-                    fee,
                     expireBlock,
                     uint256(0),
                     getChainID(),
@@ -253,7 +252,6 @@ contract Synchronizer is ISynchronizer, Ownable {
                 abi.encodePacked(
                     registrar,
                     price,
-                    fee,
                     expireBlock,
                     uint256(1),
                     getChainID(),
