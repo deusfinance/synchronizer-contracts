@@ -2,9 +2,11 @@
 pragma solidity ^0.8.10;
 
 interface IConductor {
+	event Conducted(string _id, address short, address long);
+
     function roleChecker() external view returns (address);
 	function setRoleChecker(address roleChecker_) external;
-	function adminConduct(
+	function conduct(
 		string memory _id,
 		string memory shortName,
 		string memory shortSymbol,

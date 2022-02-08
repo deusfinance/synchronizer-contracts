@@ -12,8 +12,6 @@ import "./Registrar.sol";
 contract Conductor is IConductor, Ownable {
 	address public roleChecker;
 
-    event Conduct(string _id, address short, address long);
-
 	constructor(address roleChecker_) {
 		roleChecker = roleChecker_;
 	}
@@ -22,7 +20,7 @@ contract Conductor is IConductor, Ownable {
 		roleChecker = roleChecker_;
 	}
 
-	function adminConduct(
+	function conduct(
 		string memory _id,
 		string memory shortName,
 		string memory shortSymbol,
@@ -33,7 +31,7 @@ contract Conductor is IConductor, Ownable {
 	) external returns (address, address) {
 		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version, registrarType);
 		Registrar long = new Registrar(roleChecker, longName, longSymbol, version, registrarType);
-        emit Conduct(_id, address(short), address(long));
+        emit Conducted(_id, address(short), address(long));
 
 		return (address(short), address(long));
 	}
