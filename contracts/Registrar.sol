@@ -1,7 +1,20 @@
-//Be name khoda
-//Bime Abolfazl
-
+// Be name Khoda
+// Bime Abolfazl
 // SPDX-License-Identifier: MIT
+
+// =================================================================================================================
+//  _|_|_|    _|_|_|_|  _|    _|    _|_|_|      _|_|_|_|  _|                                                       |
+//  _|    _|  _|        _|    _|  _|            _|            _|_|_|      _|_|_|  _|_|_|      _|_|_|    _|_|       |
+//  _|    _|  _|_|_|    _|    _|    _|_|        _|_|_|    _|  _|    _|  _|    _|  _|    _|  _|        _|_|_|_|     |
+//  _|    _|  _|        _|    _|        _|      _|        _|  _|    _|  _|    _|  _|    _|  _|        _|           |
+//  _|_|_|    _|_|_|_|    _|_|    _|_|_|        _|        _|  _|    _|    _|_|_|  _|    _|    _|_|_|    _|_|_|     |
+// =================================================================================================================
+// ==================== DEUS Registrar ======================
+// ==========================================================
+// DEUS Finance: https://github.com/deusfinance
+
+// Primary Author(s)
+// Vahid: https://github.com/vahid-dev
 
 pragma solidity ^0.8.3;
 
@@ -22,7 +35,7 @@ contract Registrar is dERC20, Ownable {
 	}
 
 	modifier hasRole {
-		require(IRoleChecker(roleChecker).verify(msg.sender), "Caller doesnt have role");
+		require(IRoleChecker(roleChecker).verify(msg.sender), "Registrar: role is not verified");
 		_;
 	}
 
@@ -40,4 +53,5 @@ contract Registrar is dERC20, Ownable {
     }
 
 }
+
 //Dar panah khoda

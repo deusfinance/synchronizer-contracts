@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.11;
 
 interface IPartnerManager {
-
     event PartnerAdded(address owner, uint256[3] partnerFee);
 
     function platformFee(uint256 index) external view returns (uint256);

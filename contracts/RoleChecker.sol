@@ -1,7 +1,20 @@
-//Be name khoda
-//Bime Abolfazl
-
+// Be name Khoda
+// Bime Abolfazl
 // SPDX-License-Identifier: MIT
+
+// =================================================================================================================
+//  _|_|_|    _|_|_|_|  _|    _|    _|_|_|      _|_|_|_|  _|                                                       |
+//  _|    _|  _|        _|    _|  _|            _|            _|_|_|      _|_|_|  _|_|_|      _|_|_|    _|_|       |
+//  _|    _|  _|_|_|    _|    _|    _|_|        _|_|_|    _|  _|    _|  _|    _|  _|    _|  _|        _|_|_|_|     |
+//  _|    _|  _|        _|    _|        _|      _|        _|  _|    _|  _|    _|  _|    _|  _|        _|           |
+//  _|_|_|    _|_|_|_|    _|_|    _|_|_|        _|        _|  _|    _|    _|_|_|  _|    _|    _|_|_|    _|_|_|     |
+// =================================================================================================================
+// ==================== DEUS Role Checker ===================
+// ==========================================================
+// DEUS Finance: https://github.com/deusfinance
+
+// Primary Author(s)
+// Vahid: https://github.com/vahid-dev
 
 pragma solidity ^0.8.11;
 
@@ -9,9 +22,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IRoleChecker.sol";
 
 contract RoleChecker is IRoleChecker, Ownable {
+  
     mapping(address => bool) private hasRole;
-
-    constructor () {}
 
     function verify(address caller) public view returns (bool) {
         return hasRole[caller];
@@ -25,4 +37,5 @@ contract RoleChecker is IRoleChecker, Ownable {
         delete hasRole[user];
     }
 }
+
 //Dar panah khoda

@@ -1,7 +1,20 @@
 // Be name Khoda
 // Bime Abolfazl
-
 // SPDX-License-Identifier: MIT
+
+// =================================================================================================================
+//  _|_|_|    _|_|_|_|  _|    _|    _|_|_|      _|_|_|_|  _|                                                       |
+//  _|    _|  _|        _|    _|  _|            _|            _|_|_|      _|_|_|  _|_|_|      _|_|_|    _|_|       |
+//  _|    _|  _|_|_|    _|    _|    _|_|        _|_|_|    _|  _|    _|  _|    _|  _|    _|  _|        _|_|_|_|     |
+//  _|    _|  _|        _|    _|        _|      _|        _|  _|    _|  _|    _|  _|    _|  _|        _|           |
+//  _|_|_|    _|_|_|_|    _|_|    _|_|_|        _|        _|  _|    _|    _|_|_|  _|    _|    _|_|_|    _|_|_|     |
+// =================================================================================================================
+// ================== DEUS Conductor ======================
+// ========================================================
+// DEUS Finance: https://github.com/deusfinance
+
+// Primary Author(s)
+// Vahid: https://github.com/vahid-dev
 
 pragma solidity ^0.8.11;
 
@@ -10,6 +23,7 @@ import "./interfaces/IConductor.sol";
 import "./Registrar.sol";
 
 contract Conductor is IConductor, Ownable {
+  
 	address public roleChecker;
 
 	constructor(address roleChecker_) {
@@ -31,7 +45,24 @@ contract Conductor is IConductor, Ownable {
 	) external returns (address, address) {
 		Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version, registrarType);
 		Registrar long = new Registrar(roleChecker, longName, longSymbol, version, registrarType);
-        emit Conducted(_id, address(short), address(long));
+
+    emit Conducted(
+      _id,
+      address(short),
+      shortName,
+      shortSymbol,
+      version,
+      registrarType
+    );
+
+    emit Conducted(
+      _id,
+      address(long),
+      longName,
+      longSymbol,
+      version,
+      registrarType
+    );
 
 		return (address(short), address(long));
 	}
