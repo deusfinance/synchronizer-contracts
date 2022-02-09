@@ -22,7 +22,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IRoleChecker.sol";
 
 contract RoleChecker is IRoleChecker, Ownable {
-  
     mapping(address => bool) private hasRole;
 
     function verify(address caller) public view returns (bool) {

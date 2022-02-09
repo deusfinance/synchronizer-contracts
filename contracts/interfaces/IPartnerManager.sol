@@ -6,9 +6,13 @@ interface IPartnerManager {
     event PartnerAdded(address owner, uint256[3] partnerFee);
 
     function platformFee(uint256 index) external view returns (uint256);
+
     function partnerFee(address partner, uint256 index) external view returns (uint256);
+
     function platform() external view returns (address);
+
     function scale() external view returns (uint256);
+
     function isPartner(address partner) external view returns (bool);
 
     function addPartner(
