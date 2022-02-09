@@ -25,9 +25,8 @@ import "./interfaces/IPartnerManager.sol";
 /// @author DEUS Finance
 /// @notice Partner manager for the Synchronizer
 contract PartnerManager is IPartnerManager {
-  
     uint256[3] public platformFee; // trading fee set by DEUS DAO
-    mapping(address => uint256[3]) public partnerFee; // partnerId => PartnerFee (e.g. 1e18 = 100%)
+    mapping(address => uint256[3]) public partnerFee; // partnerId => PartnerFee
     address public platform; // platform multisig address
     uint256 public scale = 1e18; // used for math
     mapping(address => bool) public isPartner; // partnership of address
@@ -49,10 +48,12 @@ contract PartnerManager is IPartnerManager {
         uint256 forexFee
     ) external {
         require(!isPartner[owner], "PartnerManager: partner already exists");
-        require(stockFee < scale - platformFee[0] &&
+        require(
+            stockFee < scale - platformFee[0] &&
                 cryptoFee < scale - platformFee[1] &&
                 forexFee < scale - platformFee[2],
-                "PartnerManager: the total fee can not be GTE 100%");
+            "PartnerManager: the total fee can not be GTE 100%"
+        );
         isPartner[owner] = true;
         partnerFee[owner] = [stockFee, cryptoFee, forexFee];
         emit PartnerAdded(owner, partnerFee[owner]);

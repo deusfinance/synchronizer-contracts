@@ -2,6 +2,7 @@
   "name": "deus-synchronizer",
   "scripts": {
     "lint": "solhint -f table contracts/**/*.sol",
+    "conduct": "node ./scripts/helpers/conduct_SP500",
     "deploy:rinkeby": "node ./scripts/deploy-rinkeby",
     "deploy:fantom": "node ./scripts/deploy-fantom"
   },

@@ -9,10 +9,10 @@ async function main() {
   for (let i = 50; i < conductData.length; i++) {
     console.log("*", conductData[i].Symbol)
     const tx = await conductor.conduct(
-      conductData[i].Symbol,
-      conductData[i].Name + " reverse synth",
+      conductData[i].symbol,
+      conductData[i].name + " reverse synth",
       "r" + conductData[i].Symbol,
-      conductData[i].Name + " synth",
+      conductData[i].name + " synth",
       "d" + conductData[i].Symbol,
       "v1.0",
       "0"
