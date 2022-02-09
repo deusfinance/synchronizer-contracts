@@ -7,13 +7,13 @@ async function main() {
   const conductor = conductorInstance.attach(conductorAddress)
 
   for (let i = 50; i < conductData.length; i++) {
-    console.log("*", conductData[i].Symbol)
+    console.log("*", conductData[i].symbol)
     const tx = await conductor.conduct(
       conductData[i].symbol,
       conductData[i].name + " reverse synth",
-      "r" + conductData[i].Symbol,
+      "r" + conductData[i].symbol,
       conductData[i].name + " synth",
-      "d" + conductData[i].Symbol,
+      "d" + conductData[i].symbol,
       "v1.0",
       "0"
     )
