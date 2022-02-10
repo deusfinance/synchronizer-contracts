@@ -27,7 +27,7 @@ import "./interfaces/IPartnerManager.sol";
 
 /// @title Synchronizer
 /// @author DEUS Finance
-/// @notice DEUS router for trading synthetic contracts
+/// @notice DEUS router for trading Registrar contracts
 abstract contract Synchronizer is ISynchronizer, Ownable {
     using ECDSA for bytes32;
 
@@ -90,8 +90,8 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @notice utility function for frontends
     /// @param partnerId address of partner
     /// @param amountOut amountOut to be received
-    /// @param registrar synthetic token address
-    /// @param price synthetic price
+    /// @param registrar Registrar token address
+    /// @param price Registrar price
     /// @param action 0 is sell & 1 is buy
     /// @return amountIn required to receive the desired amountOut
     function getAmountIn(
@@ -103,10 +103,10 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     ) public view returns (uint256 amountIn) {
         uint256 fee = _getTotalFee(partnerId, registrar);
         if (action == 0) {
-            // sell synthetic token
+            // sell Registrar
             amountIn = (amountOut * price) / scale - fee; // x = y * (price) * (1 / 1 - fee)
         } else {
-            // buy synthetic token
+            // buy Registrar
             amountIn = (amountOut * scale * scale) / (price * (scale - fee)); // x = y * / (price * (1 - fee))
         }
     }
@@ -114,8 +114,8 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @notice utility function for frontends
     /// @param amountIn exact amount user wants to spend
     /// @param partnerId address of partner
-    /// @param registrar synthetic token address
-    /// @param price synthetic price
+    /// @param registrar Registrar token address
+    /// @param price Registrar price
     /// @param action 0 is sell & 1 is buy
     /// @return amountOut to be received
     function getAmountOut(
@@ -127,23 +127,23 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     ) public view returns (uint256 amountOut) {
         uint256 fee = _getTotalFee(partnerId, registrar);
         if (action == 0) {
-            // sell synthetic token
+            // sell Registrar
             uint256 collateralAmount = (amountIn * price) / scale;
             uint256 feeAmount = (collateralAmount * fee) / scale;
             amountOut = collateralAmount - feeAmount;
         } else {
-            // buy synthetic token
+            // buy Registrar
             uint256 feeAmount = (amountIn * fee) / scale;
             uint256 collateralAmount = amountIn - feeAmount;
             amountOut = (collateralAmount * scale) / price;
         }
     }
 
-    /// @notice buy a synthetic
+    /// @notice buy a Registrar
     /// @dev SchnorrSign is a TSS structure
     /// @param partnerId partner address
-    /// @param receipient receipient of the synthetic
-    /// @param registrar synthetic token address
+    /// @param receipient receipient of the Registrar
+    /// @param registrar Registrar token address
     /// @param amountIn DEI amount to spend (18 decimals)
     /// @param price registrar price according to Muon
     /// @param expireBlock signature expiry blockNumber
@@ -186,11 +186,11 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         emit Buy(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
 
-    /// @notice sell a synthetic
+    /// @notice sell a Registrar
     /// @dev SchnorrSign is a TSS structure
     /// @param partnerId partner address
     /// @param receipient receipient of the collateral
-    /// @param registrar synthetic token address
+    /// @param registrar Registrar token address
     /// @param amountIn registrar amount to spend (18 decimals)
     /// @param price registrar price according to Muon
     /// @param expireBlock signature expiry blockNumber
