@@ -78,7 +78,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         return id;
     }
 
-    function _getTotalFee(address partnerId, address registrar) internal view returns (uint256 fee) {
+    function getTotalFee(address partnerId, address registrar) public view returns (uint256 fee) {
         uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
             partnerId,
             IRegistrar(registrar).registrarType()
@@ -101,7 +101,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountIn) {
-        uint256 fee = _getTotalFee(partnerId, registrar);
+        uint256 fee = getTotalFee(partnerId, registrar);
         if (action == 0) {
             // sell Registrar
             amountIn = (amountOut * price) / scale - fee; // x = y * (price) * (1 / 1 - fee)
@@ -125,7 +125,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         uint256 price,
         uint256 action
     ) public view returns (uint256 amountOut) {
-        uint256 fee = _getTotalFee(partnerId, registrar);
+        uint256 fee = getTotalFee(partnerId, registrar);
         if (action == 0) {
             // sell Registrar
             uint256 collateralAmount = (amountIn * price) / scale;
@@ -163,7 +163,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
 
-        uint256 fee = _getTotalFee(partnerId, registrar);
+        uint256 fee = getTotalFee(partnerId, registrar);
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(1), getChainId(), appId));
@@ -210,7 +210,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
 
-        uint256 fee = _getTotalFee(partnerId, registrar);
+        uint256 fee = getTotalFee(partnerId, registrar);
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(0), getChainId(), appId));
