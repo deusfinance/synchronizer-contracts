@@ -3,7 +3,8 @@
 pragma solidity ^0.8.10;
 
 interface IConductor {
-    event Conducted(string _id, address registrar, string name, string symbol, string version, uint256 registrarType);
+    event Conducted(string _id, address short, address long);
+    event Liquidated(address liquidatedRegistrar, address newRegistrar);
 
     function roleChecker() external view returns (address);
 

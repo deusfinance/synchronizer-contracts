@@ -20,6 +20,7 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IConductor.sol";
+import "./interfaces/IRegistrar.sol";
 import "./Registrar.sol";
 
 contract Conductor is IConductor, Ownable {
@@ -45,11 +46,23 @@ contract Conductor is IConductor, Ownable {
         Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version, registrarType);
         Registrar long = new Registrar(roleChecker, longName, longSymbol, version, registrarType);
 
-        emit Conducted(_id, address(short), shortName, shortSymbol, version, registrarType);
-
-        emit Conducted(_id, address(long), longName, longSymbol, version, registrarType);
+        emit Conducted(_id, address(short), address(long));
 
         return (address(short), address(long));
+    }
+
+    function liquidate(
+        address registrar,
+        string memory liquidatedName,
+        string memory liquidatedSymbol,
+        string memory version
+    ) external onlyOwner {
+        string memory name = IRegistrar(registrar).name();
+        string memory symbol = IRegistrar(registrar).symbol();
+        uint256 registrarType = IRegistrar(registrar).registrarType();
+        IRegistrar(registrar).rename(liquidatedName, liquidatedSymbol);
+        Registrar newRegistrar = new Registrar(roleChecker, name, symbol, version, registrarType);
+        emit Liquidated(registrar, address(newRegistrar));
     }
 }
 
