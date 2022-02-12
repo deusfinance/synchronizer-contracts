@@ -28,7 +28,7 @@ interface ISynchronizer {
     event SetAppId(uint8 oldId, uint8 newId);
     event SetVirtualReserve(uint256 oldReserve, uint256 newReserve);
     event SetMuonContract(address oldContract, address newContract);
-    event UseVirtualReserveToggled(bool useVirtualReserve);
+    event ToggleUseVirtualReserve(bool useVirtualReserve);
 
     function deiContract() external view returns (address);
 

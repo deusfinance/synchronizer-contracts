@@ -276,7 +276,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @dev this affects buyback and recollateralize functions on the DEI minter pool
     function toggleUseVirtualReserve() external onlyOwner {
         useVirtualReserve = !useVirtualReserve;
-        emit UseVirtualReserveToggled(useVirtualReserve);
+        emit ToggleUseVirtualReserve(useVirtualReserve);
     }
 }
 
