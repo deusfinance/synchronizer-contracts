@@ -5,6 +5,7 @@ const deployRegistrar = require("./deploy/registrar")
 const deployPartnerManager = require("./deploy/partner_manager")
 const { verifyAll } = require("./helpers/deploy_contract")
 const { sleep } = require("./helpers/sleep")
+const { constructName, constructSymbol, constructVersion } = require("./helpers/naming")
 
 async function main() {
   // configuration
@@ -45,15 +46,21 @@ async function main() {
   })
 
   await sleep(30000)
-  await conductor.adminConduct("BTC", "Bitcoin reverse synth", "rBTC", "Bitcoin synth", "dBTC", "v1.0", "1")
+  await conductor.adminConduct(
+    "BTC",
+    constructName("Bitcoin", "SHORT"),
+    constructSymbol("BTC", "SHORT"),
+    constructVersion(1, 0),
+    "1"
+  )
 
   // await sleep(30000)
   // await deployRegistrar({
-  //     roleChecker: roleChecker.address,
-  //     name: 'Verified Synthetic token',
-  //     symbol: 'VST',
-  //     version: 'v1.0.0',
-  //     type: '0'
+  //   roleChecker: roleChecker.address,
+  //   name: constructName("Verified", "LONG"),
+  //   symbol: constructSymbol("VST", "LONG"),
+  //   version: constructVersion(1, 0),
+  //   type: "0",
   // })
 
   await verifyAll()
