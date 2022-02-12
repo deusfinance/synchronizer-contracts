@@ -146,7 +146,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @param registrar Registrar token address
     /// @param amountIn DEI amount to spend (18 decimals)
     /// @param price registrar price according to Muon
-    /// @param expireBlock signature expiry blockNumber
+    /// @param expireBlock last valid blockNumber before the signatures expire
     /// @param _reqId Muon request id
     /// @param sigs Muon TSS signatures
     function buyFor(
@@ -193,7 +193,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @param registrar Registrar token address
     /// @param amountIn registrar amount to spend (18 decimals)
     /// @param price registrar price according to Muon
-    /// @param expireBlock signature expiry blockNumber
+    /// @param expireBlock last valid blockNumber before the signatures expire
     /// @param _reqId Muon request id
     /// @param sigs Muon TSS signatures
     function sellFor(
