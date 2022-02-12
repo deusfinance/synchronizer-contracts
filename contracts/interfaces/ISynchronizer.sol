@@ -38,7 +38,7 @@ interface ISynchronizer {
 
     function scale() external view returns (uint256);
 
-    function trades(address partner, uint256 registrarType) external view returns (uint256);
+    function feeCollector(address partner, uint256 registrarType) external view returns (uint256);
 
     function virtualReserve() external view returns (uint256);
 
