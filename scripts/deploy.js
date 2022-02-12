@@ -1,20 +1,17 @@
-const deploySync = require('./deploy_contracts/deploy_sync.js');
-
-const { verifyAll } = require('./helpers/deploy_contract.js');
+const deploySync = require("./deploy/synchronizer")
+const { verifyAll } = require("./helpers/deploy_contract")
 
 async function main() {
+  await deploySync()
 
-    await deploySync();
-
-    await verifyAll();
+  await verifyAll()
 }
-
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main()
-    .then(() => process.exit(0))
-    .catch(error => {
-        console.error(error);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

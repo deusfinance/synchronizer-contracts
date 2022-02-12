@@ -8,6 +8,10 @@ struct SchnorrSign {
     address nonce;
 }
 
-interface IMuonV02{
-    function verify(bytes calldata reqId, uint256 hash, SchnorrSign[] calldata _sigs) external returns (bool);
+interface IMuonV02 {
+    function verify(
+        bytes calldata reqId,
+        uint256 hash,
+        SchnorrSign[] calldata _sigs
+    ) external returns (bool);
 }

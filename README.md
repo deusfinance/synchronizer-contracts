@@ -1,8 +1,8 @@
 # synchronizer smart contracts
 
-Deus ecosystem synthetic tokens' market maker
+DEUS Ecosystem AMM for Registrars
 
-### Pre Requisites
+### Prerequisites
 
 You will need the following software on your machine:
 
@@ -40,4 +40,3 @@ For security concerns, please email [admin@deus.finance](mailto:admin@deus.finan
 ## License
 
 [MIT](./LICENSE.md) © Mainframe Group Inc.
-
