@@ -26,7 +26,7 @@ import "./interfaces/IPartnerManager.sol";
 /// @notice Partner manager for the Synchronizer
 contract PartnerManager is IPartnerManager {
     uint256[3] public platformFee; // trading fee set by DEUS DAO
-    mapping(address => uint256[3]) public partnerFee; // partnerId => PartnerFee
+    mapping(address => uint256[3]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee]
     address public platform; // platform multisig address
     uint256 public scale = 1e18; // used for math
     mapping(address => bool) public isPartner; // partnership of address
@@ -37,9 +37,10 @@ contract PartnerManager is IPartnerManager {
     }
 
     /// @notice become a partner of DEUS DAO
+    /// @dev fees (18 decimals) are expressed as multipliers, e.g. 1% should be inserted as 0.01
     /// @param owner address of partner
     /// @param stockFee fee charged for stocks (e.g. 0.1%)
-    /// @param cryptoFee fee charged for crypto (e.g. 0.3%)
+    /// @param cryptoFee fee charged for crypto (e.g. 0.1%)
     /// @param forexFee fee charged for forex (e.g. 0.1%)
     function addPartner(
         address owner,
