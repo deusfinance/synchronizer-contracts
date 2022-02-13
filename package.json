@@ -2,9 +2,10 @@
   "name": "deus-synchronizer",
   "scripts": {
     "lint": "solhint -f table contracts/**/*.sol",
-    "conduct": "node ./scripts/helpers/conduct_SP500",
-    "deploy:rinkeby": "node ./scripts/deploy-rinkeby",
-    "deploy:fantom": "node ./scripts/deploy-fantom"
+    "compile": "npx hardhat compile",
+    "conduct:fantom": "npx hardhat run ./scripts/helpers/conduct_SP500.js --network fantom",
+    "deploy:rinkeby": "npx hardhat run ./scripts/deploy-rinkeby.js --network rinkeby",
+    "deploy:fantom": "npx hardhat run ./scripts/deploy-fantom.js --network fantom"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",

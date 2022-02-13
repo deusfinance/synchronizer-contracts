@@ -1,13 +1,13 @@
-const conductData = require("./data/SP500.json")
-const { sleep } = require("../sleep")
+const conductData = require("../data/SP500.json")
+const { sleep } = require("./sleep")
 const { constructName, constructSymbol, constructVersion } = require("./naming")
 
 async function main() {
-  const conductorAddress = "0x3DA90Ea1733d7C579124AA6b31BdeC24c63197DB" // fantom
+  const conductorAddress = "0x570D710d9F20599551246EC24D8A8cCffeb57Ccf" // fantom
   const conductorInstance = await hre.ethers.getContractFactory("Conductor")
   const conductor = conductorInstance.attach(conductorAddress)
 
-  for (let i = 50; i < conductData.length; i++) {
+  for (let i = 484; i < conductData.length; i++) {
     console.log("*", conductData[i].symbol)
     const tx = await conductor.conduct(
       conductData[i].symbol,
@@ -19,7 +19,7 @@ async function main() {
       "0"
     )
     // console.log(tx)
-    await sleep(5000)
+    await sleep(10000)
   }
 }
 

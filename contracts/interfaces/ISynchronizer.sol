@@ -75,7 +75,7 @@ interface ISynchronizer {
         uint256 expireBlock,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external;
+    ) external returns (uint256 registrarAmount);
 
     function sellFor(
         address partnerId,
@@ -86,7 +86,7 @@ interface ISynchronizer {
         uint256 expireBlock,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external;
+    ) external returns (uint256 deiAmount);
 
     function withdrawFee(address receipient, uint256 registrarType) external;
 

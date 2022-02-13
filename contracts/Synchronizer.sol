@@ -28,7 +28,7 @@ import "./interfaces/IPartnerManager.sol";
 /// @title Synchronizer
 /// @author DEUS Finance
 /// @notice DEUS router for trading Registrar contracts
-abstract contract Synchronizer is ISynchronizer, Ownable {
+contract Synchronizer is ISynchronizer, Ownable {
     using ECDSA for bytes32;
 
     // variables
@@ -119,8 +119,8 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
     /// @param action 0 is sell & 1 is buy
     /// @return amountOut to be received
     function getAmountOut(
-        address registrar,
         address partnerId,
+        address registrar,
         uint256 amountIn,
         uint256 price,
         uint256 action
@@ -158,12 +158,10 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         uint256 expireBlock,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external {
+    ) external returns (uint256 registrarAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
-
-        uint256 fee = getTotalFee(partnerId, registrar);
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(1), getChainId(), appId));
@@ -172,7 +170,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
         }
 
-        uint256 feeAmount = (amountIn * fee) / scale;
+        uint256 feeAmount = (amountIn * getTotalFee(partnerId, registrar)) / scale;
         uint256 collateralAmount = amountIn - feeAmount;
 
         feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
@@ -180,7 +178,7 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
         if (useVirtualReserve) virtualReserve -= amountIn;
 
-        uint256 registrarAmount = (collateralAmount * scale) / price;
+        registrarAmount = (collateralAmount * scale) / price;
         IRegistrar(registrar).mint(receipient, registrarAmount);
 
         emit Buy(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
@@ -205,12 +203,10 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
         uint256 expireBlock,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external {
+    ) external returns (uint256 deiAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
-
-        uint256 fee = getTotalFee(partnerId, registrar);
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(0), getChainId(), appId));
@@ -219,13 +215,13 @@ abstract contract Synchronizer is ISynchronizer, Ownable {
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
         }
         uint256 collateralAmount = (amountIn * price) / scale;
-        uint256 feeAmount = (collateralAmount * fee) / scale;
+        uint256 feeAmount = (collateralAmount * getTotalFee(partnerId, registrar)) / scale;
 
         feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
 
         IRegistrar(registrar).burn(msg.sender, amountIn);
 
-        uint256 deiAmount = collateralAmount - feeAmount;
+        deiAmount = collateralAmount - feeAmount;
         IDEIStablecoin(deiContract).pool_mint(receipient, deiAmount);
         if (useVirtualReserve) virtualReserve += deiAmount;
 
