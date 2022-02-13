@@ -1,214 +1,279 @@
 // Be name Khoda
 // Bime Abolfazl
-
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.3;
+// =================================================================================================================
+//  _|_|_|    _|_|_|_|  _|    _|    _|_|_|      _|_|_|_|  _|                                                       |
+//  _|    _|  _|        _|    _|  _|            _|            _|_|_|      _|_|_|  _|_|_|      _|_|_|    _|_|       |
+//  _|    _|  _|_|_|    _|    _|    _|_|        _|_|_|    _|  _|    _|  _|    _|  _|    _|  _|        _|_|_|_|     |
+//  _|    _|  _|        _|    _|        _|      _|        _|  _|    _|  _|    _|  _|    _|  _|        _|           |
+//  _|_|_|    _|_|_|_|    _|_|    _|_|_|        _|        _|  _|    _|    _|_|_|  _|    _|    _|_|_|    _|_|_|     |
+// =================================================================================================================
+// ==================== DEUS Synchronizer ===================
+// ==========================================================
+// DEUS Finance: https://github.com/deusfinance
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+// Primary Author(s)
+// Vahid: https://github.com/vahid-dev
 
-interface IERC20 {
-	function totalSupply() external view returns (uint256);
-	function balanceOf(address account) external view returns (uint256);
-	function mint(address to, uint256 amount) external;
-	function burn(address from, uint256 amount) external;
-	function transfer(address recipient, uint256 amount) external returns (bool);
-	function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-}
+pragma solidity ^0.8.11;
 
-interface Registrar {
-	function totalSupply() external view returns (uint256);
-	function mint(address to, uint256 amount) external;
-	function burn(address from, uint256 amount) external;
-}
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "./interfaces/ISynchronizer.sol";
+import "./interfaces/IDEIStablecoin.sol";
+import "./interfaces/IRegistrar.sol";
+import "./interfaces/IPartnerManager.sol";
 
-contract Synchronizer is AccessControl {
-	// roles
-	bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
-	bytes32 public constant FEE_WITHDRAWER_ROLE = keccak256("FEE_WITHDRAWER_ROLE");
-	bytes32 public constant COLLATERAL_WITHDRAWER_ROLE = keccak256("COLLATERAL_WITHDRAWER_ROLE");
-	bytes32 public constant REMAINING_DOLLAR_CAP_SETTER_ROLE = keccak256("REMAINING_DOLLAR_CAP_SETTER_ROLE");
+/// @title Synchronizer
+/// @author DEUS Finance
+/// @notice DEUS router for trading Registrar contracts
+contract Synchronizer is ISynchronizer, Ownable {
+    using ECDSA for bytes32;
 
-	// variables
-	uint256 public minimumRequiredSignature;
-	IERC20 public collateralToken;
-	uint256 public remainingDollarCap;
-	uint256 public scale = 1e18;
-	uint256 public collateralScale = 1e10;
-	uint256 public withdrawableFeeAmount;
+    // variables
+    address public muonContract; // address of Muon verifier contract
+    address public deiContract; // address of DEI token
+    address public partnerManager; // address of partner manager contract
+    uint256 public minimumRequiredSignatures; // minimum number of signatures required
+    uint256 public scale = 1e18; // used for math
+    mapping(address => uint256[3]) public feeCollector; // partnerId => cumulativeFee
+    uint256 public virtualReserve; // used for collatDollarBalance()
+    uint8 public appId; // Muon's app Id
+    bool public useVirtualReserve; // to change collatDollarBalance() return amount
 
-	// events
-	event Buy(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
-	event Sell(address user, address registrar, uint256 registrarAmount, uint256 collateralAmount, uint256 feeAmount);
-	event WithdrawFee(uint256 amount, address recipient);
-	event WithdrawCollateral(uint256 amount, address recipient);
-
-	constructor (
-		uint256 _remainingDollarCap,
-		uint256 _minimumRequiredSignature,
-		address _collateralToken
-	)
-	{
-		remainingDollarCap = _remainingDollarCap;
-		minimumRequiredSignature = _minimumRequiredSignature;
-		collateralToken = IERC20(_collateralToken);
-		_setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-		_setupRole(FEE_WITHDRAWER_ROLE, msg.sender);
-		_setupRole(COLLATERAL_WITHDRAWER_ROLE, msg.sender);
-	
-	}
-
-	function setMinimumRequiredSignature(uint256 _minimumRequiredSignature) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		minimumRequiredSignature = _minimumRequiredSignature;
-	}
-
-	function setCollateralToken(address _collateralToken) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		collateralToken = IERC20(_collateralToken);
-	}
-
-	function setRemainingDollarCap(uint256 _remainingDollarCap) external {
-		require(hasRole(REMAINING_DOLLAR_CAP_SETTER_ROLE, msg.sender), "Caller is not a remainingDollarCap setter");
-		remainingDollarCap = _remainingDollarCap;
-	}
-
-	function sellFor(
-		address _user,
-		uint256 multiplier,
-		address registrar,
-		uint256 amount,
-		uint256 fee,
-		uint256[] memory blockNos,
-		uint256[] memory prices,
-		uint8[] memory v,
-		bytes32[] memory r,
-		bytes32[] memory s
-	)
-		external
-	{
-		uint256 price = prices[0];
-		address lastOracle;
-
-		for (uint256 index = 0; index < minimumRequiredSignature; ++index) {
-			require(blockNos[index] >= block.number, "Signature is expired");
-			if(prices[index] < price) {
-				price = prices[index];
-			}
-			address oracle = getSigner(registrar, 8, multiplier, fee, blockNos[index], prices[index], v[index], r[index], s[index]);
-			require(hasRole(ORACLE_ROLE, oracle), "signer is not an oracle");
-
-			require(oracle > lastOracle, "Signers are same");
-			lastOracle = oracle;
-		}
-
-		//---------------------------------------------------------------------------------
-
-		uint256 collateralAmount = amount * price / (scale * collateralScale);
-		uint256 feeAmount = collateralAmount * fee / scale;
-
-		remainingDollarCap = remainingDollarCap + (collateralAmount * multiplier);
-
-		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
-
-		Registrar(registrar).burn(msg.sender, amount);
-
-		collateralToken.transfer(_user, collateralAmount - feeAmount);
-
-		emit Sell(_user, registrar, amount, collateralAmount, feeAmount);
-	}
-
-	function buyFor(
-		address _user,
-		uint256 multiplier,
-		address registrar,
-		uint256 amount,
-		uint256 fee,
-		uint256[] memory blockNos,
-		uint256[] memory prices,
-		uint8[] memory v, 
-		bytes32[] memory r,
-		bytes32[] memory s
-	)
-		external
-	{
-		uint256 price = prices[0];
-        address lastOracle;
-        
-		for (uint256 index = 0; index < minimumRequiredSignature; ++index) {
-			require(blockNos[index] >= block.number, "Signature is expired");
-			if(prices[index] > price) {
-				price = prices[index];
-			}
-			address oracle = getSigner(registrar, 9, multiplier, fee, blockNos[index], prices[index], v[index], r[index], s[index]);
-			require(hasRole(ORACLE_ROLE, oracle), "Signer is not an oracle");
-
-			require(oracle > lastOracle, "Signers are same");
-			lastOracle = oracle;
-		}
-
-		//---------------------------------------------------------------------------------
-		uint256 collateralAmount = amount * price / (scale * collateralScale);
-		uint256 feeAmount = collateralAmount * fee / scale;
-
-		remainingDollarCap = remainingDollarCap - (collateralAmount * multiplier);
-		withdrawableFeeAmount = withdrawableFeeAmount + feeAmount;
-
-		collateralToken.transferFrom(msg.sender, address(this), collateralAmount + feeAmount);
-
-		Registrar(registrar).mint(_user, amount);
-
-		emit Buy(_user, registrar, amount, collateralAmount, feeAmount);
-	}
-
-	function getSigner(
-		address registrar,
-		uint256 isBuy,
-		uint256 multiplier,
-		uint256 fee,
-		uint256 blockNo,
-		uint256 price,
-		uint8 v,
-		bytes32 r,
-		bytes32 s
-	)
-		pure
-		internal
-		returns (address)
-	{
-        bytes32 message = prefixed(keccak256(abi.encodePacked(registrar, isBuy, multiplier, fee, blockNo, price)));
-		return ecrecover(message, v, r, s);
+    constructor(
+        address deiContract_,
+        address muonContract_,
+        address partnerManager_,
+        uint256 minimumRequiredSignatures_,
+        uint256 virtualReserve_,
+        uint8 appId_
+    ) {
+        deiContract = deiContract_;
+        muonContract = muonContract_;
+        partnerManager = partnerManager_;
+        minimumRequiredSignatures = minimumRequiredSignatures_;
+        virtualReserve = virtualReserve_;
+        appId = appId_;
     }
 
-	function prefixed(
-		bytes32 hash
-	)
-		internal
-		pure
-		returns(bytes32)
-	{
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
+    /// @notice This function use pool feature to manage buyback and recollateralize on DEI minter pool
+    /// @dev simulates the collateral in the contract
+    /// @param collat_usd_price pool's collateral price (is 1e6) (decimal is 6)
+    /// @return amount of collateral in the contract
+    function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
+        if (!useVirtualReserve) return 0;
+        uint256 deiCollateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
+        return (virtualReserve * collat_usd_price * deiCollateralRatio) / 1e12;
     }
 
-	//---------------------------------------------------------------------------------------
+    /// @notice utility function used for generating trade signatures
+    /// @return the chainId
+    function getChainId() public view returns (uint256) {
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        return id;
+    }
 
-	function withdrawFee(uint256 _amount, address _recipient) external {
-		require(hasRole(FEE_WITHDRAWER_ROLE, msg.sender), "Caller is not a FeeWithdrawer");
+    function getTotalFee(address partnerId, address registrar) public view returns (uint256 fee) {
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
+            partnerId,
+            IRegistrar(registrar).registrarType()
+        );
+        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+        fee = partnerFee + platformFee;
+    }
 
-		withdrawableFeeAmount = withdrawableFeeAmount - _amount;
-		collateralToken.transfer(_recipient, _amount);
+    /// @notice utility function for frontends
+    /// @param partnerId address of partner
+    /// @param amountOut amountOut to be received
+    /// @param registrar Registrar token address
+    /// @param price Registrar price
+    /// @param action 0 is sell & 1 is buy
+    /// @return amountIn required to receive the desired amountOut
+    function getAmountIn(
+        address partnerId,
+        address registrar,
+        uint256 amountOut,
+        uint256 price,
+        uint256 action
+    ) public view returns (uint256 amountIn) {
+        uint256 fee = getTotalFee(partnerId, registrar);
+        if (action == 0) {
+            // sell Registrar
+            amountIn = (amountOut * price) / (scale - fee); // x = y * (price) * (1 / 1 - fee)
+        } else {
+            // buy Registrar
+            amountIn = (amountOut * scale * scale) / (price * (scale - fee)); // x = y * / (price * (1 - fee))
+        }
+    }
 
-		emit WithdrawFee(_amount, _recipient);
-	}
+    /// @notice utility function for frontends
+    /// @param amountIn exact amount user wants to spend
+    /// @param partnerId address of partner
+    /// @param registrar Registrar token address
+    /// @param price Registrar price
+    /// @param action 0 is sell & 1 is buy
+    /// @return amountOut to be received
+    function getAmountOut(
+        address partnerId,
+        address registrar,
+        uint256 amountIn,
+        uint256 price,
+        uint256 action
+    ) public view returns (uint256 amountOut) {
+        uint256 fee = getTotalFee(partnerId, registrar);
+        if (action == 0) {
+            // sell Registrar
+            uint256 collateralAmount = (amountIn * price) / scale;
+            uint256 feeAmount = (collateralAmount * fee) / scale;
+            amountOut = collateralAmount - feeAmount;
+        } else {
+            // buy Registrar
+            uint256 feeAmount = (amountIn * fee) / scale;
+            uint256 collateralAmount = amountIn - feeAmount;
+            amountOut = (collateralAmount * scale) / price;
+        }
+    }
 
-	function withdrawCollateral(uint256 _amount, address _recipient) external {
-		require(hasRole(COLLATERAL_WITHDRAWER_ROLE, msg.sender), "Caller is not a CollateralWithdrawer");
+    /// @notice buy a Registrar
+    /// @dev SchnorrSign is a TSS structure
+    /// @param partnerId partner address
+    /// @param receipient receipient of the Registrar
+    /// @param registrar Registrar token address
+    /// @param amountIn DEI amount to spend (18 decimals)
+    /// @param price registrar price according to Muon
+    /// @param expireBlock last valid blockNumber before the signatures expire
+    /// @param _reqId Muon request id
+    /// @param sigs Muon TSS signatures
+    function buyFor(
+        address partnerId,
+        address receipient,
+        address registrar,
+        uint256 amountIn,
+        uint256 price,
+        uint256 expireBlock,
+        bytes calldata _reqId,
+        SchnorrSign[] calldata sigs
+    ) external returns (uint256 registrarAmount) {
+        require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
+        require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
+        require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
 
-		collateralToken.transfer(_recipient, _amount);
+        {
+            bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(1), getChainId(), appId));
 
-		emit WithdrawCollateral(_amount, _recipient);
-	}
+            IMuonV02 muon = IMuonV02(muonContract);
+            require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
+        }
 
+        uint256 feeAmount = (amountIn * getTotalFee(partnerId, registrar)) / scale;
+        uint256 collateralAmount = amountIn - feeAmount;
+
+        feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
+
+        IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
+        if (useVirtualReserve) virtualReserve -= amountIn;
+
+        registrarAmount = (collateralAmount * scale) / price;
+        IRegistrar(registrar).mint(receipient, registrarAmount);
+
+        emit Buy(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
+    }
+
+    /// @notice sell a Registrar
+    /// @dev SchnorrSign is a TSS structure
+    /// @param partnerId partner address
+    /// @param receipient receipient of the collateral
+    /// @param registrar Registrar token address
+    /// @param amountIn registrar amount to spend (18 decimals)
+    /// @param price registrar price according to Muon
+    /// @param expireBlock last valid blockNumber before the signatures expire
+    /// @param _reqId Muon request id
+    /// @param sigs Muon TSS signatures
+    function sellFor(
+        address partnerId,
+        address receipient,
+        address registrar,
+        uint256 amountIn,
+        uint256 price,
+        uint256 expireBlock,
+        bytes calldata _reqId,
+        SchnorrSign[] calldata sigs
+    ) external returns (uint256 deiAmount) {
+        require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
+        require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
+        require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
+
+        {
+            bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(0), getChainId(), appId));
+
+            IMuonV02 muon = IMuonV02(muonContract);
+            require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
+        }
+        uint256 collateralAmount = (amountIn * price) / scale;
+        uint256 feeAmount = (collateralAmount * getTotalFee(partnerId, registrar)) / scale;
+
+        feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
+
+        IRegistrar(registrar).burn(msg.sender, amountIn);
+
+        deiAmount = collateralAmount - feeAmount;
+        IDEIStablecoin(deiContract).pool_mint(receipient, deiAmount);
+        if (useVirtualReserve) virtualReserve += deiAmount;
+
+        emit Sell(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
+    }
+
+    /// @notice withdraw accumulated trading fee
+    /// @dev fee will be minted in DEI
+    /// @param receipient receiver of fee
+    /// @param registrarType type of registrar
+    function withdrawFee(address receipient, uint256 registrarType) external {
+        require(feeCollector[msg.sender][registrarType] > 0, "Synchronizer: INSUFFICIENT_FEE");
+        uint256 partnerFee = (feeCollector[msg.sender][registrarType] *
+            (IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType) -
+                IPartnerManager(partnerManager).platformFee(registrarType))) / scale;
+        uint256 platformFee = feeCollector[msg.sender][registrarType] - partnerFee;
+        IDEIStablecoin(deiContract).pool_mint(receipient, partnerFee);
+        IDEIStablecoin(deiContract).pool_mint(IPartnerManager(partnerManager).platform(), platformFee);
+        feeCollector[msg.sender][registrarType] = 0;
+        emit WithdrawFee(msg.sender, partnerFee, platformFee, registrarType);
+    }
+
+    /// @notice change the minimum required signatures for trading
+    /// @param minimumRequiredSignatures_ number of required signatures
+    function setMinimumRequiredSignatures(uint256 minimumRequiredSignatures_) external onlyOwner {
+        emit SetMinimumRequiredSignatures(minimumRequiredSignatures, minimumRequiredSignatures_);
+        minimumRequiredSignatures = minimumRequiredSignatures_;
+    }
+
+    /// @notice change Muon's app id
+    /// @dev appIdd distinguishes us from other Muon apps
+    /// @param appId_ Muon's app id
+    function setAppId(uint8 appId_) external onlyOwner {
+        emit SetAppId(appId, appId_);
+        appId = appId_;
+    }
+
+    function setVirtualReserve(uint256 virtualReserve_) external onlyOwner {
+        emit SetVirtualReserve(virtualReserve, virtualReserve_);
+        virtualReserve = virtualReserve_;
+    }
+
+    function setMuonContract(address muonContract_) external onlyOwner {
+        emit SetMuonContract(muonContract, muonContract_);
+        muonContract = muonContract_;
+    }
+
+    /// @dev this affects buyback and recollateralize functions on the DEI minter pool
+    function toggleUseVirtualReserve() external onlyOwner {
+        useVirtualReserve = !useVirtualReserve;
+        emit ToggleUseVirtualReserve(useVirtualReserve);
+    }
 }
 
 //Dar panah khoda

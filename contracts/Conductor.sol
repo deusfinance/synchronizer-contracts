@@ -1,52 +1,69 @@
 // Be name Khoda
 // Bime Abolfazl
-
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.3;
+// =================================================================================================================
+//  _|_|_|    _|_|_|_|  _|    _|    _|_|_|      _|_|_|_|  _|                                                       |
+//  _|    _|  _|        _|    _|  _|            _|            _|_|_|      _|_|_|  _|_|_|      _|_|_|    _|_|       |
+//  _|    _|  _|_|_|    _|    _|    _|_|        _|_|_|    _|  _|    _|  _|    _|  _|    _|  _|        _|_|_|_|     |
+//  _|    _|  _|        _|    _|        _|      _|        _|  _|    _|  _|    _|  _|    _|  _|        _|           |
+//  _|_|_|    _|_|_|_|    _|_|    _|_|_|        _|        _|  _|    _|    _|_|_|  _|    _|    _|_|_|    _|_|_|     |
+// =================================================================================================================
+// ================== DEUS Conductor ======================
+// ========================================================
+// DEUS Finance: https://github.com/deusfinance
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+// Primary Author(s)
+// Vahid: https://github.com/vahid-dev
+
+pragma solidity ^0.8.11;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IConductor.sol";
+import "./interfaces/IRegistrar.sol";
 import "./Registrar.sol";
 
-contract Conductor is AccessControl {
-    mapping(string => address) public registrars;
+contract Conductor is IConductor, Ownable {
+    address public roleChecker;
 
-	address public synchronizer;
-	address public admin;
-	address public liquidator;
+    constructor(address roleChecker_) {
+        roleChecker = roleChecker_;
+    }
 
-    event Conduct(string _id, address short, address long);
+    function setRoleChecker(address roleChecker_) external onlyOwner {
+        roleChecker = roleChecker_;
+    }
 
-	constructor(address _synchronizer, address _admin, address _liquidator) {
-		synchronizer = _synchronizer;
-		admin = _admin;	
-		liquidator = _liquidator;
-		_setupRole(DEFAULT_ADMIN_ROLE, _admin);
-	}
+    function conduct(
+        string memory _id,
+        string memory shortName,
+        string memory shortSymbol,
+        string memory longName,
+        string memory longSymbol,
+        string memory version,
+        uint256 registrarType
+    ) external returns (address, address) {
+        Registrar short = new Registrar(roleChecker, shortName, shortSymbol, version, registrarType);
+        Registrar long = new Registrar(roleChecker, longName, longSymbol, version, registrarType);
 
-	function setAddresses(address _synchronizer, address _admin, address _liquidator) public{
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		liquidator = _liquidator;
-		synchronizer = _synchronizer;
-		admin = _admin;	
-	}
+        emit Conducted(_id, address(short), address(long));
 
-	function adminConduct(
-		string memory _id,
-		string memory shortName,
-		string memory shortSymbol,
-		string memory longName,
-		string memory longSymbol
-	)external{
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-		Registrar short = new Registrar(admin, synchronizer, liquidator, shortName, shortSymbol);
-		Registrar long = new Registrar(admin, synchronizer, liquidator, longName, longSymbol);
+        return (address(short), address(long));
+    }
 
-        registrars[_id] = address(long);
-    
-        emit conduct(_id, address(short), address(long));
-	}
-
+    function liquidate(
+        address registrar,
+        string memory liquidatedName,
+        string memory liquidatedSymbol,
+        string memory version
+    ) external onlyOwner {
+        string memory name = IRegistrar(registrar).name();
+        string memory symbol = IRegistrar(registrar).symbol();
+        uint256 registrarType = IRegistrar(registrar).registrarType();
+        IRegistrar(registrar).rename(liquidatedName, liquidatedSymbol);
+        Registrar newRegistrar = new Registrar(roleChecker, name, symbol, version, registrarType);
+        emit Liquidated(registrar, address(newRegistrar));
+    }
 }
 
 //Dar panah khoda
