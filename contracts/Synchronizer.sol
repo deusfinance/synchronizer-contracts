@@ -104,7 +104,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 fee = getTotalFee(partnerId, registrar);
         if (action == 0) {
             // sell Registrar
-            amountIn = (amountOut * price) / scale - fee; // x = y * (price) * (1 / 1 - fee)
+            amountIn = (amountOut * price) / (scale - fee); // x = y * (price) * (1 / 1 - fee)
         } else {
             // buy Registrar
             amountIn = (amountOut * scale * scale) / (price * (scale - fee)); // x = y * / (price * (1 - fee))
