@@ -37,7 +37,7 @@ contract Synchronizer is ISynchronizer, Ownable {
     address public partnerManager; // address of partner manager contract
     uint256 public minimumRequiredSignatures; // minimum number of signatures required
     uint256 public scale = 1e18; // used for math
-    mapping(address => uint256[3]) public feeCollector; // partnerId => cumulativeFee
+    mapping(address => uint256[5]) public feeCollector; // partnerId => cumulativeFee
     uint256 public virtualReserve; // used for collatDollarBalance()
     uint8 public appId; // Muon's app Id
     bool public useVirtualReserve; // to change collatDollarBalance() return amount
