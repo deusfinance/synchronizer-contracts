@@ -26,7 +26,7 @@ import "./interfaces/IPartnerManager.sol";
 /// @notice Partner manager for the Synchronizer
 contract PartnerManager is IPartnerManager {
     uint256[5] public platformFee; // trading fee set by DEUS DAO
-    mapping(address => uint256[5]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee, commoditiesFee, miscFee]
+    mapping(address => uint256[5]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee, commodityFee, miscFee]
     address public platform; // platform multisig address
     uint256 public scale = 1e18; // used for math
     mapping(address => bool) public isPartner; // partnership of address
