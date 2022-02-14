@@ -1,0 +1,52 @@
+[
+    {
+        "name": "Ethereum",
+        "sector": "Crypto",
+        "symbol": "ETH"
+    },
+    {
+        "name": "Solana",
+        "sector": "Crypto",
+        "symbol": "SOL"
+    },
+    {
+        "name": "Cardano",
+        "sector": "Crypto",
+        "symbol": "ADA"
+    },
+    {
+        "name": "Euro",
+        "sector": "Forex",
+        "symbol": "EUR"
+    },
+    {
+        "name": "Pound sterling",
+        "sector": "Forex",
+        "symbol": "GBP"
+    },
+    {
+        "name": "New Zealand Dollar",
+        "sector": "Forex",
+        "symbol": "NZD"
+    },
+    {
+        "name": "Australian Dollar",
+        "sector": "Forex",
+        "symbol": "AUD"
+    },
+    {
+        "name": "Japanese Yen",
+        "sector": "Forex",
+        "symbol": "JPY"
+    },
+    {
+        "name": "Swiss Franc",
+        "sector": "Forex",
+        "symbol": "CHF"
+    },
+    {
+        "name": "Canadian Dollar",
+        "sector": "Forex",
+        "symbol": "CAD"
+    }
+]
