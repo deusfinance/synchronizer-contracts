@@ -4,6 +4,7 @@
     "lint": "solhint -f table contracts/**/*.sol",
     "compile": "npx hardhat compile",
     "conduct:fantom": "npx hardhat run ./scripts/helpers/conduct_SP500.js --network fantom",
+    "conduct-crypto-forex:fantom": "npx hardhat run ./scripts/deploy-crypto-and-forex.js --network fantom",
     "deploy:rinkeby": "npx hardhat run ./scripts/deploy-rinkeby.js --network rinkeby",
     "deploy:fantom": "npx hardhat run ./scripts/deploy-fantom.js --network fantom"
   },
