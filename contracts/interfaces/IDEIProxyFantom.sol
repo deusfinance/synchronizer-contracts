@@ -3,15 +3,14 @@
 pragma solidity ^0.8.11;
 
 interface IDEIProxy {
-    
     struct ProxyInput {
-        uint amountIn;
-        uint minAmountOut;
-        uint deusPriceUSD;
-        uint colPriceUSD;
-        uint usdcForMintAmount;
-        uint deusNeededAmount;
-        uint expireBlock;
+        uint256 amountIn;
+        uint256 minAmountOut;
+        uint256 deusPriceUSD;
+        uint256 colPriceUSD;
+        uint256 usdcForMintAmount;
+        uint256 deusNeededAmount;
+        uint256 expireBlock;
         bytes[] sigs;
     }
 
@@ -29,16 +28,12 @@ interface IDEIProxy {
             uint256 deusNeededAmount
         );
 
-    function USDC2DEI(ProxyInput memory proxyInput)
-        external
-        returns (uint256 deiAmount);
+    function USDC2DEI(ProxyInput memory proxyInput) external returns (uint256 deiAmount);
 
-	function ERC202DEI(ProxyInput memory proxyInput, address[] memory path)
-        external
-        returns (uint256 deiAmount);
+    function ERC202DEI(ProxyInput memory proxyInput, address[] memory path) external returns (uint256 deiAmount);
 
-	function Nativecoin2DEI(ProxyInput memory proxyInput, address[] memory path) 
-		payable 
-		external 
-		returns (uint deiAmount);
+    function Nativecoin2DEI(ProxyInput memory proxyInput, address[] memory path)
+        external
+        payable
+        returns (uint256 deiAmount);
 }
