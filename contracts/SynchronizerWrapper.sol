@@ -21,27 +21,10 @@ pragma abicoder v2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/ISynchronizer.sol";
-import "./interfaces/IDEIProxyFantom.sol";
+import "./interfaces/IDEIProxy.sol";
+import "./interfaces/ISynchronizerWrapper.sol";
 
-struct WrapperInput {
-    address partnerId;
-    address receipient;
-    address registrar;
-    uint256 price;
-    uint256 expireBlock;
-    bytes reqId;
-    SchnorrSign[] sigs;
-}
-
-struct WrapperViewInput {
-    address partnerId;
-    address registrar;
-    uint256 amountIn;
-    uint256 price;
-    uint256 action;
-}
-
-contract SynchronizerWrapper {
+contract SynchronizerWrapper is ISynchronizerWrapper {
     /* ========== STATE VARIABLES ========== */
 
     address public uniswapRouter;  // Spiritswap router on fantom
@@ -71,6 +54,7 @@ contract SynchronizerWrapper {
     }
 
     /* ========== PUBLIC FUNCTIONS ========== */
+
     /// @notice to sell registrars to the ERC20 tokens on Spiritswap
     /// @param amountIn registrar amount
     /// @param input WrapperInput used in synchronizer main contract
