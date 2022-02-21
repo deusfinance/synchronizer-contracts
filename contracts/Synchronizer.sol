@@ -78,12 +78,20 @@ contract Synchronizer is ISynchronizer, Ownable {
         return id;
     }
 
+    /// @notice Calculate the fee percentage of registrar type for a specific partner
+    /// @param partnerId address of partner
+    /// @param registrar Registrar token address
+    /// @return fee percentage (scale is 1e18)
     function getTotalFee(address partnerId, address registrar) public view returns (uint256 fee) {
         uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
             partnerId,
             IRegistrar(registrar).registrarType()
         );
-        uint256 platformFee = IPartnerManager(partnerManager).platformFee(IRegistrar(registrar).registrarType());
+        uint256 platformFee = IPartnerManager(partnerManager).minPlatformFee(IRegistrar(registrar).registrarType());
+        uint256 minTotalFee = IPartnerManager(partnerManager).minTotalFee(IRegistrar(registrar).registrarType());
+        if (partnerFee + platformFee <= minTotalFee) {
+            fee = minTotalFee;
+        }
         fee = partnerFee + platformFee;
     }
 
@@ -234,14 +242,17 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @param registrarType type of registrar
     function withdrawFee(address receipient, uint256 registrarType) external {
         require(feeCollector[msg.sender][registrarType] > 0, "Synchronizer: INSUFFICIENT_FEE");
-        uint256 partnerFee = (feeCollector[msg.sender][registrarType] *
-            (IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType) -
-                IPartnerManager(partnerManager).platformFee(registrarType))) / scale;
-        uint256 platformFee = feeCollector[msg.sender][registrarType] - partnerFee;
-        IDEIStablecoin(deiContract).pool_mint(receipient, partnerFee);
-        IDEIStablecoin(deiContract).pool_mint(IPartnerManager(partnerManager).platform(), platformFee);
+
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType);
+
+        uint256 partnerFeeAmount = feeCollector[msg.sender][registrarType] * partnerFee / scale;
+        uint256 platformFeeAmount = feeCollector[msg.sender][registrarType] - partnerFeeAmount;
+
+        IDEIStablecoin(deiContract).pool_mint(receipient, partnerFeeAmount);
+        IDEIStablecoin(deiContract).pool_mint(IPartnerManager(partnerManager).platformFeeCollector(), platformFeeAmount);
         feeCollector[msg.sender][registrarType] = 0;
-        emit WithdrawFee(msg.sender, partnerFee, platformFee, registrarType);
+
+        emit WithdrawFee(msg.sender, partnerFeeAmount, platformFeeAmount, registrarType);
     }
 
     /// @notice change the minimum required signatures for trading

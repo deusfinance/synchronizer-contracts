@@ -19,4 +19,11 @@ interface IConductor {
         string memory version,
         uint256 registrarType
     ) external returns (address, address);
+
+    function liquidate(
+        address registrar,
+        string memory liquidatedName,
+        string memory liquidatedSymbol,
+        string memory version
+    ) external;
 }
