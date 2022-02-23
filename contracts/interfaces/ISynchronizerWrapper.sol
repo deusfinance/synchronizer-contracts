@@ -44,6 +44,14 @@ interface ISynchronizerWrapper {
         address[] calldata path
     ) external;
 
+    function sellToETH(
+        uint256 amountIn,
+        WrapperInput memory input,
+        uint256 minAmountOut,
+        address[] calldata path
+    ) external;
+
+
     function buyWithMinting(
         WrapperInput memory input,
         IDEIProxy.ProxyInput memory proxyInput,
