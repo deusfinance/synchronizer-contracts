@@ -49,6 +49,7 @@ contract SynchronizerWrapper {
 	address public usdc;
 	address public deiProxy;
 	address public synchronizer;
+	address public wrappedNative;
 
 	uint public deadline = 0xf000000000000000000000000000000000000000000000000000000000000000;
 
@@ -59,13 +60,15 @@ contract SynchronizerWrapper {
 		address dei_,
 		address usdc_,
 		address deiProxy_,
-		address synchronizer_
+		address synchronizer_,
+		address wrappedNative_
 	) {
 		uniswapRouter = uniswapRouter_;
 		dei = dei_;
 		usdc = usdc_;
 		deiProxy = deiProxy_;
 	    synchronizer = synchronizer_;
+		wrappedNative = wrappedNative_;
 
 		IERC20(usdc).approve(deiProxy, type(uint256).max);
 		IERC20(dei).approve(synchronizer, type(uint256).max);
@@ -93,10 +96,31 @@ contract SynchronizerWrapper {
 				input.reqId,
 				input.sigs
 			);
-			uint amountOut = deiAmount;
-			if(path[path.length -1] != dei){
-				amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(deiAmount, 0, path, input.receipient, deadline)[path.length -1];
+			uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(deiAmount, 0, path, input.receipient, deadline)[path.length -1];
+			require(amountOut >= minAmountOut, "INSUFFICIENT_AMOUNT_OUT");
+	}
+
+	function sellToETH(
+		uint256 amountIn,
+		WrapperInput memory input,
+		uint256 minAmountOut,
+		address[] calldata path
+	) external {
+			IERC20(input.registrar).transferFrom(msg.sender, address(this), amountIn);
+			if (IERC20(input.registrar).allowance(address(this), synchronizer) < amountIn) {
+				IERC20(input.registrar).approve(synchronizer, type(uint).max);
 			}
+			uint deiAmount = ISynchronizer(synchronizer).sellFor(
+				input.partnerId,
+				address(this),
+				input.registrar,
+				amountIn,
+				input.price,
+				input.expireBlock,
+				input.reqId,
+				input.sigs
+			);
+			uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForETH(deiAmount, 0, path, input.receipient, deadline)[path.length -1];
 			require(amountOut >= minAmountOut, "INSUFFICIENT_AMOUNT_OUT");
 	}
 
@@ -111,12 +135,12 @@ contract SynchronizerWrapper {
 			uint256 deiAmount = proxyInput.amountIn;
 			if(path[0] == usdc){
 				deiAmount = IDEIProxy(deiProxy).USDC2DEI(proxyInput);
-			}else if(path[0] != dei){
-				if (IERC20(path[0]).allowance(address(this), deiProxy) < proxyInput.amountIn) {
-					IERC20(path[0]).approve(deiProxy, type(uint).max);
-				}
-				deiAmount = IDEIProxy(deiProxy).ERC202DEI(proxyInput, path);
 			}
+			if (IERC20(path[0]).allowance(address(this), deiProxy) < proxyInput.amountIn) {
+				IERC20(path[0]).approve(deiProxy, type(uint).max);
+			}
+			deiAmount = IDEIProxy(deiProxy).ERC202DEI(proxyInput, path);
+			
 			require(deiAmount >= minAmountOut, "INSUFFICIENT_AMOUNT_OUT");
 			ISynchronizer(synchronizer).buyFor(
 				input.partnerId,
@@ -137,13 +161,11 @@ contract SynchronizerWrapper {
 		address[] calldata path
 	) external {
 			IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
-			uint256 deiAmount = amountIn;
-			if(path[0] != dei){
-				if (IERC20(path[0]).allowance(address(this), uniswapRouter) < amountIn) {
-					IERC20(path[0]).approve(uniswapRouter, type(uint).max);
-				}
-				deiAmount = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(amountIn, 0, path, address(this), deadline)[path.length -1];
+			if (IERC20(path[0]).allowance(address(this), uniswapRouter) < amountIn) {
+				IERC20(path[0]).approve(uniswapRouter, type(uint).max);
 			}
+			uint256 deiAmount = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(amountIn, 0, path, address(this), deadline)[path.length -1];
+			
 			require(deiAmount >= minAmountOut, "INSUFFICIENT_AMOUNT_OUT");
 			ISynchronizer(synchronizer).buyFor(
 				input.partnerId,
@@ -218,22 +240,16 @@ contract SynchronizerWrapper {
 					syncInput.price, 
 					syncInput.action
 				);
-			if(path[path.length - 1] != dei){
-				amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
-			}else{
-				amountOut = deiAmount;
-			}
+			amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
 		}
 		else{
-			if(path[0] != dei){
-				(syncInput.amountIn, usdcForMintAmount, deusNeededAmount) = IDEIProxy(deiProxy)
-					.getAmountsOut(
-						syncInput.amountIn,
-						deusPriceUSD,
-						collateralPrice,
-						path
-					);
-			}
+			(syncInput.amountIn, usdcForMintAmount, deusNeededAmount) = IDEIProxy(deiProxy)
+				.getAmountsOut(
+					syncInput.amountIn,
+					deusPriceUSD,
+					collateralPrice,
+					path
+				);
 			// buy stock with dei
 			amountOut = ISynchronizer(synchronizer)
 				.getAmountOut(
@@ -259,16 +275,10 @@ contract SynchronizerWrapper {
 					syncInput.price, 
 					syncInput.action
 				);
-			if(path[path.length -1] != dei){
-				amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[ path.length - 1 ];
-			}else{
-				amountOut = deiAmount;
-			}
+			amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[ path.length - 1 ];
 		}
 		else{
-			if(path[0] != dei){
-				syncInput.amountIn = IUniswapV2Router02(uniswapRouter).getAmountsOut(syncInput.amountIn, path)[path.length - 1]; 
-			}
+			syncInput.amountIn = IUniswapV2Router02(uniswapRouter).getAmountsOut(syncInput.amountIn, path)[path.length - 1]; 
 			// buy stock with dei
 			amountOut = ISynchronizer(synchronizer)
 				.getAmountOut(
