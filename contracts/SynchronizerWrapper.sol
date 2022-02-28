@@ -30,12 +30,12 @@ import "./interfaces/ISynchronizerWrapper.sol";
 contract SynchronizerWrapper is ISynchronizerWrapper {
     /* ========== STATE VARIABLES ========== */
 
-    address public uniswapRouter;  // Spiritswap router on fantom
-    address public dei;  // address of DEI token
-    address public usdc;  // address of USDC token
-    address public deiProxy;  // address of DEI Proxy contract
-    address public synchronizer;  // address of synchronizer main contract
-    uint256 public deadline = 0xf000000000000000000000000000000000000000000000000000000000000000;  // used for swaps on spiritswap router
+    address public uniswapRouter; // Spiritswap router on fantom
+    address public dei; // address of DEI token
+    address public usdc; // address of USDC token
+    address public deiProxy; // address of DEI Proxy contract
+    address public synchronizer; // address of synchronizer main contract
+    uint256 public deadline = 0xf000000000000000000000000000000000000000000000000000000000000000; // used for swaps on spiritswap router
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -83,18 +83,18 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
             input.reqId,
             input.sigs
         );
-        
-		uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(
-			deiAmount,
-			0,
-			path,
-			input.receipient,
-			deadline
-		)[path.length - 1];
+
+        uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(
+            deiAmount,
+            0,
+            path,
+            input.receipient,
+            deadline
+        )[path.length - 1];
         require(amountOut >= minAmountOut, "SynchronizerWrapper: INSUFFICIENT_AMOUNT_OUT");
     }
 
-	/// @notice to sell registrars to the ETH tokens on Spiritswap
+    /// @notice to sell registrars to the ETH tokens on Spiritswap
     /// @param amountIn registrar amount
     /// @param input WrapperInput used in synchronizer main contract
     /// @param minAmountOut minimum amount of ETH that you want at the end
@@ -119,14 +119,14 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
             input.reqId,
             input.sigs
         );
-        
-		uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForETH(
-			deiAmount,
-			0,
-			path,
-			input.receipient,
-			deadline
-		)[path.length - 1];
+
+        uint256 amountOut = IUniswapV2Router02(uniswapRouter).swapExactTokensForETH(
+            deiAmount,
+            0,
+            path,
+            input.receipient,
+            deadline
+        )[path.length - 1];
         require(amountOut >= minAmountOut, "SynchronizerWrapper: INSUFFICIENT_AMOUNT_OUT");
     }
 
@@ -179,17 +179,17 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
     ) external {
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         uint256 deiAmount = amountIn;
-		if (IERC20(path[0]).allowance(address(this), uniswapRouter) < amountIn) {
-			IERC20(path[0]).approve(uniswapRouter, type(uint256).max);
-		}
-		deiAmount = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(
-			amountIn,
-			0,
-			path,
-			address(this),
-			deadline
-		)[path.length - 1];
-        
+        if (IERC20(path[0]).allowance(address(this), uniswapRouter) < amountIn) {
+            IERC20(path[0]).approve(uniswapRouter, type(uint256).max);
+        }
+        deiAmount = IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(
+            amountIn,
+            0,
+            path,
+            address(this),
+            deadline
+        )[path.length - 1];
+
         require(deiAmount >= minAmountOut, "SynchronizerWrapper: INSUFFICIENT_AMOUNT_OUT");
         ISynchronizer(synchronizer).buyFor(
             input.partnerId,
@@ -285,15 +285,14 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
                 syncInput.price,
                 syncInput.action
             );
-			amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
-            
+            amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
         } else {
-			(syncInput.amountIn, usdcForMintAmount, deusNeededAmount) = IDEIProxy(deiProxy).getAmountsOut(
-				syncInput.amountIn,
-				deusPriceUSD,
-				collateralPrice,
-				path
-			);
+            (syncInput.amountIn, usdcForMintAmount, deusNeededAmount) = IDEIProxy(deiProxy).getAmountsOut(
+                syncInput.amountIn,
+                deusPriceUSD,
+                collateralPrice,
+                path
+            );
             // buy stock with dei
             amountOut = ISynchronizer(synchronizer).getAmountOut(
                 syncInput.partnerId,
@@ -308,10 +307,7 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
     /// @notice returns registrar amount throught Spiritswap router or returns DEI amount when selling registrars
     /// @param syncInput WrapperInput used in synchronizer main contract
     /// @param path path used in Spiritswap router (default path is [0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3])
-    function getAmountsOut(
-        WrapperViewInput memory syncInput,
-        address[] calldata path
-    )
+    function getAmountsOut(WrapperViewInput memory syncInput, address[] calldata path)
         public
         view
         returns (uint256 amountOut)
@@ -324,12 +320,11 @@ contract SynchronizerWrapper is ISynchronizerWrapper {
                 syncInput.price,
                 syncInput.action
             );
-			amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
-
+            amountOut = IUniswapV2Router02(uniswapRouter).getAmountsOut(deiAmount, path)[path.length - 1];
         } else {
-			syncInput.amountIn = IUniswapV2Router02(uniswapRouter).getAmountsOut(syncInput.amountIn, path)[
-				path.length - 1
-			];
+            syncInput.amountIn = IUniswapV2Router02(uniswapRouter).getAmountsOut(syncInput.amountIn, path)[
+                path.length - 1
+            ];
             // buy stock with dei
             amountOut = ISynchronizer(synchronizer).getAmountOut(
                 syncInput.partnerId,

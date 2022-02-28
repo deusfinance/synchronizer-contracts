@@ -51,7 +51,6 @@ interface ISynchronizerWrapper {
         address[] calldata path
     ) external;
 
-
     function buyWithMinting(
         WrapperInput memory input,
         IDEIProxy.ProxyInput memory proxyInput,
