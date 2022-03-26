@@ -31,25 +31,25 @@ interface ISynchronizer {
     event ToggleUseVirtualReserve(bool useVirtualReserve);
     event SetExpireTime(uint256 oldExpireTime, uint256 newExpireTime);
 
-    function deiContract() external view returns (address);
+    function version() external view returns (string memory);
+
+    function mintHelper() external view returns (address);
 
     function muonContract() external view returns (address);
+
+    function partnerManager() external view returns (address);
 
     function minimumRequiredSignatures() external view returns (uint256);
 
     function scale() external view returns (uint256);
 
+    function expireTime() external view returns (uint256);
+
     function feeCollector(address partner, uint256 registrarType) external view returns (uint256);
 
-    function cap(address partner) external view returns (uint256);
-
-    function virtualReserve() external view returns (uint256);
+    function cap(address partner) external view returns (int256);
 
     function appId() external view returns (uint8);
-
-    function useVirtualReserve() external view returns (bool);
-
-    function collatDollarBalance(uint256 collat_usd_price) external view returns (uint256);
 
     function getChainId() external view returns (uint256);
 
@@ -97,11 +97,8 @@ interface ISynchronizer {
 
     function setAppId(uint8 appId_) external;
 
-    function setVirtualReserve(uint256 virtualReserve_) external;
 
     function setMuonContract(address muonContract_) external;
-
-    function toggleUseVirtualReserve() external;
 }
 
 //Dar panah khoda

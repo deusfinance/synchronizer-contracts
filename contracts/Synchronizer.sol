@@ -20,7 +20,7 @@ pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/ISynchronizer.sol";
-import "./interfaces/IDEIStablecoin.sol";
+import "./interfaces/IMintHelper.sol";
 import "./interfaces/IRegistrar.sol";
 import "./interfaces/IPartnerManager.sol";
 
@@ -33,43 +33,29 @@ contract Synchronizer is ISynchronizer, Ownable {
     // variables
     string public version = "v1.2.0";
     address public muonContract; // address of Muon verifier contract
-    address public deiContract; // address of DEI token
+    address public mintHelper; // address of mint helper contract
     address public partnerManager; // address of partner manager contract
     uint256 public minimumRequiredSignatures; // minimum number of signatures required
     uint256 public scale = 1e18; // used for math
-    uint256 public virtualReserve; // used for collatDollarBalance()
     uint256 public expireTime; // valid time of muon signatures
     mapping(address => uint256[]) public feeCollector; // partnerId => cumulativeFee
-    mapping(address => uint256) public cap; // partnerId => openPositionsVolume
+    mapping(address => int256) public cap; // partnerId => openPositionsVolume
     uint8 public appId; // Muon's app Id
-    bool public useVirtualReserve; // to change collatDollarBalance() return amount
 
     constructor(
-        address deiContract_,
+        address mintHelper_,
         address muonContract_,
         address partnerManager_,
         uint256 minimumRequiredSignatures_,
-        uint256 virtualReserve_,
         uint256 expireTime_,
         uint8 appId_
     ) {
-        deiContract = deiContract_;
+        mintHelper = mintHelper_;
         muonContract = muonContract_;
         partnerManager = partnerManager_;
         minimumRequiredSignatures = minimumRequiredSignatures_;
-        virtualReserve = virtualReserve_;
         expireTime = expireTime_;
         appId = appId_;
-    }
-
-    /// @notice This function use pool feature to manage buyback and recollateralize on DEI minter pool
-    /// @dev simulates the collateral in the contract
-    /// @param collat_usd_price pool's collateral price (is 1e6) (decimal is 6)
-    /// @return amount of collateral in the contract
-    function collatDollarBalance(uint256 collat_usd_price) public view returns (uint256) {
-        if (!useVirtualReserve) return 0;
-        uint256 deiCollateralRatio = IDEIStablecoin(deiContract).global_collateral_ratio();
-        return (virtualReserve * collat_usd_price * deiCollateralRatio) / 1e12;
     }
 
     /// @notice utility function used for generating trade signatures
@@ -176,7 +162,8 @@ contract Synchronizer is ISynchronizer, Ownable {
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
         require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
-        require(amountIn + cap[partnerId] <= IPartnerManager(partnerManager).maxCap(partnerId), "Synchronizer: MAX_CAP");
+        require(int256(amountIn) > 0, "Synchronizer: INVALID_AMOUNTIN");
+        require(int256(amountIn) + cap[partnerId] <= IPartnerManager(partnerManager).maxCap(partnerId), "Synchronizer: MAX_CAP");
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(1), getChainId(), appId, timestamp));
@@ -190,9 +177,9 @@ contract Synchronizer is ISynchronizer, Ownable {
 
         feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
 
-        IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
-        if (useVirtualReserve) virtualReserve -= amountIn;
-        cap[partnerId] += amountIn;
+        IMintHelper(mintHelper).burnFrom(msg.sender, amountIn);
+
+        cap[partnerId] += int256(amountIn);
 
         registrarAmount = (collateralAmount * scale) / price;
         IRegistrar(registrar).mint(receipient, registrarAmount);
@@ -232,6 +219,9 @@ contract Synchronizer is ISynchronizer, Ownable {
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
         }
         uint256 collateralAmount = (amountIn * price) / scale;
+
+        require(int256(collateralAmount) > 0, "Synchronizer: INVALID_COLLATERAL_AMOUNT");
+
         uint256 feeAmount = (collateralAmount * getTotalFee(partnerId, registrar)) / scale;
 
         feeCollector[partnerId][IRegistrar(registrar).registrarType()] += feeAmount;
@@ -239,13 +229,9 @@ contract Synchronizer is ISynchronizer, Ownable {
         IRegistrar(registrar).burn(msg.sender, amountIn);
 
         deiAmount = collateralAmount - feeAmount;
-        IDEIStablecoin(deiContract).pool_mint(receipient, deiAmount);
-        if (useVirtualReserve) virtualReserve += deiAmount;
-        if (collateralAmount > cap[partnerId]) {
-            cap[partnerId] = 0;
-        } else {
-            cap[partnerId] -= collateralAmount;
-        }
+        IMintHelper(mintHelper).mint(receipient, deiAmount);
+
+        cap[partnerId] -= int256(collateralAmount);
 
         emit Sell(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
@@ -262,11 +248,9 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 partnerFeeAmount = (feeCollector[msg.sender][registrarType] * partnerFee) / scale;
         uint256 platformFeeAmount = feeCollector[msg.sender][registrarType] - partnerFeeAmount;
 
-        IDEIStablecoin(deiContract).pool_mint(receipient, partnerFeeAmount);
-        IDEIStablecoin(deiContract).pool_mint(
-            IPartnerManager(partnerManager).platformFeeCollector(),
-            platformFeeAmount
-        );
+        IMintHelper(mintHelper).mint(receipient, partnerFeeAmount);
+        IMintHelper(mintHelper).mint(IPartnerManager(partnerManager).platformFeeCollector(), platformFeeAmount);
+
         feeCollector[msg.sender][registrarType] = 0;
 
         emit WithdrawFee(msg.sender, partnerFeeAmount, platformFeeAmount, registrarType);
@@ -287,20 +271,9 @@ contract Synchronizer is ISynchronizer, Ownable {
         appId = appId_;
     }
 
-    function setVirtualReserve(uint256 virtualReserve_) external onlyOwner {
-        emit SetVirtualReserve(virtualReserve, virtualReserve_);
-        virtualReserve = virtualReserve_;
-    }
-
     function setMuonContract(address muonContract_) external onlyOwner {
         emit SetMuonContract(muonContract, muonContract_);
         muonContract = muonContract_;
-    }
-
-    /// @dev this affects buyback and recollateralize functions on the DEI minter pool
-    function toggleUseVirtualReserve() external onlyOwner {
-        useVirtualReserve = !useVirtualReserve;
-        emit ToggleUseVirtualReserve(useVirtualReserve);
     }
 
     function setExpireTime(uint256 expireTime_) external onlyOwner {

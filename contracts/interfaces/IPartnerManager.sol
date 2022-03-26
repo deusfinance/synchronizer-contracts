@@ -5,7 +5,7 @@ pragma solidity ^0.8.11;
 interface IPartnerManager {
     event RegistrarFeeAdded(address owner, uint256[] registrarType, uint256[] partnerFee);
     event PlatformFeeAdded(uint256[] registrarType, uint256[] minPlatformFee, uint256[] minTotalFee);
-    event SetCap(address partnerId, uint256 cap);
+    event SetCap(address partnerId, int256 cap);
 
     function minPlatformFee(uint256 index) external view returns (uint256);
 
@@ -19,7 +19,7 @@ interface IPartnerManager {
 
     function isPartner(address partner) external view returns (bool);
 
-    function maxCap(address partner) external view returns (uint256);
+    function maxCap(address partner) external view returns (int256);
 
     function addRegistrarFee(uint256[] memory registrarType, uint256[] memory partnerFee_) external;
 

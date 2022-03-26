@@ -32,12 +32,13 @@ contract PartnerManager is IPartnerManager, Ownable {
     uint256[] public minTotalFee;  // minimum trading fee (total fee) set by DEUS DAO
     mapping(address => uint256[]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee, commodityFee, miscFee]
     mapping(address => bool) public isPartner; // partnership of address
-    mapping(address => uint256) public maxCap; // maximum cap of open positions volume
+    mapping(address => int256) public maxCap; // maximum cap of open positions volume
 
-    constructor(address platformFeeCollector_, uint256[] memory minPlatformFee_, uint256[] memory minTotalFee_) {
+    constructor(address owner, address platformFeeCollector_, uint256[] memory minPlatformFee_, uint256[] memory minTotalFee_) {
         platformFeeCollector = platformFeeCollector_;
         minPlatformFee = minPlatformFee_;
         minTotalFee = minTotalFee_;
+        transferOwnership(owner);
     }
 
     /// @notice become a partner of DEUS DAO
@@ -69,7 +70,8 @@ contract PartnerManager is IPartnerManager, Ownable {
         emit PlatformFeeAdded(registrarType, minPlatformFee_, minTotalFee_);
     }
 
-    function setCap(address partnerId, uint256 cap) external onlyOwner {
+    function setCap(address partnerId, int256 cap) external onlyOwner {
+        require(cap >= 0, "ParnerManager: INVALID_CAP");
         maxCap[partnerId] = cap;
         emit SetCap(partnerId, cap);
     }
