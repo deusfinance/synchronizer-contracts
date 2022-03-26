@@ -1,5 +1,4 @@
 // Be name Khoda
-// Bime Abolfazl
 // SPDX-License-Identifier: MIT
 
 // =================================================================================================================
@@ -16,7 +15,7 @@
 // Primary Author(s)
 // Vahid: https://github.com/vahid-dev
 
-pragma solidity ^0.8.11;
+pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -32,13 +31,16 @@ contract Synchronizer is ISynchronizer, Ownable {
     using ECDSA for bytes32;
 
     // variables
+    string public version = "v1.2.0";
     address public muonContract; // address of Muon verifier contract
     address public deiContract; // address of DEI token
     address public partnerManager; // address of partner manager contract
     uint256 public minimumRequiredSignatures; // minimum number of signatures required
     uint256 public scale = 1e18; // used for math
-    mapping(address => uint256[5]) public feeCollector; // partnerId => cumulativeFee
     uint256 public virtualReserve; // used for collatDollarBalance()
+    uint256 public expireTime; // valid time of muon signatures
+    mapping(address => uint256[]) public feeCollector; // partnerId => cumulativeFee
+    mapping(address => uint256) public cap; // partnerId => openPositionsVolume
     uint8 public appId; // Muon's app Id
     bool public useVirtualReserve; // to change collatDollarBalance() return amount
 
@@ -48,6 +50,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         address partnerManager_,
         uint256 minimumRequiredSignatures_,
         uint256 virtualReserve_,
+        uint256 expireTime_,
         uint8 appId_
     ) {
         deiContract = deiContract_;
@@ -55,6 +58,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         partnerManager = partnerManager_;
         minimumRequiredSignatures = minimumRequiredSignatures_;
         virtualReserve = virtualReserve_;
+        expireTime = expireTime_;
         appId = appId_;
     }
 
@@ -91,8 +95,9 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 minTotalFee = IPartnerManager(partnerManager).minTotalFee(IRegistrar(registrar).registrarType());
         if (partnerFee + platformFee <= minTotalFee) {
             fee = minTotalFee;
+        } else {
+            fee = partnerFee + platformFee;
         }
-        fee = partnerFee + platformFee;
     }
 
     /// @notice utility function for frontends
@@ -154,7 +159,7 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @param registrar Registrar token address
     /// @param amountIn DEI amount to spend (18 decimals)
     /// @param price registrar price according to Muon
-    /// @param expireBlock last valid blockNumber before the signatures expire
+    /// @param timestamp timestamp for signatures expiration
     /// @param _reqId Muon request id
     /// @param sigs Muon TSS signatures
     function buyFor(
@@ -163,16 +168,18 @@ contract Synchronizer is ISynchronizer, Ownable {
         address registrar,
         uint256 amountIn,
         uint256 price,
-        uint256 expireBlock,
+        uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
     ) external returns (uint256 registrarAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
+        require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
+        require(amountIn + cap[partnerId] <= IPartnerManager(partnerManager).maxCap(partnerId), "Synchronizer: MAX_CAP");
 
         {
-            bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(1), getChainId(), appId));
+            bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(1), getChainId(), appId, timestamp));
 
             IMuonV02 muon = IMuonV02(muonContract);
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
@@ -185,6 +192,7 @@ contract Synchronizer is ISynchronizer, Ownable {
 
         IDEIStablecoin(deiContract).pool_burn_from(msg.sender, amountIn);
         if (useVirtualReserve) virtualReserve -= amountIn;
+        cap[partnerId] += amountIn;
 
         registrarAmount = (collateralAmount * scale) / price;
         IRegistrar(registrar).mint(receipient, registrarAmount);
@@ -199,7 +207,7 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @param registrar Registrar token address
     /// @param amountIn registrar amount to spend (18 decimals)
     /// @param price registrar price according to Muon
-    /// @param expireBlock last valid blockNumber before the signatures expire
+    /// @param timestamp timestamp for signatures expiration
     /// @param _reqId Muon request id
     /// @param sigs Muon TSS signatures
     function sellFor(
@@ -208,16 +216,17 @@ contract Synchronizer is ISynchronizer, Ownable {
         address registrar,
         uint256 amountIn,
         uint256 price,
-        uint256 expireBlock,
+        uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
     ) external returns (uint256 deiAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
+        require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
 
         {
-            bytes32 hash = keccak256(abi.encodePacked(registrar, price, expireBlock, uint256(0), getChainId(), appId));
+            bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(0), getChainId(), appId, timestamp));
 
             IMuonV02 muon = IMuonV02(muonContract);
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
@@ -232,6 +241,11 @@ contract Synchronizer is ISynchronizer, Ownable {
         deiAmount = collateralAmount - feeAmount;
         IDEIStablecoin(deiContract).pool_mint(receipient, deiAmount);
         if (useVirtualReserve) virtualReserve += deiAmount;
+        if (collateralAmount > cap[partnerId]) {
+            cap[partnerId] = 0;
+        } else {
+            cap[partnerId] -= collateralAmount;
+        }
 
         emit Sell(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
@@ -245,11 +259,14 @@ contract Synchronizer is ISynchronizer, Ownable {
 
         uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType);
 
-        uint256 partnerFeeAmount = feeCollector[msg.sender][registrarType] * partnerFee / scale;
+        uint256 partnerFeeAmount = (feeCollector[msg.sender][registrarType] * partnerFee) / scale;
         uint256 platformFeeAmount = feeCollector[msg.sender][registrarType] - partnerFeeAmount;
 
         IDEIStablecoin(deiContract).pool_mint(receipient, partnerFeeAmount);
-        IDEIStablecoin(deiContract).pool_mint(IPartnerManager(partnerManager).platformFeeCollector(), platformFeeAmount);
+        IDEIStablecoin(deiContract).pool_mint(
+            IPartnerManager(partnerManager).platformFeeCollector(),
+            platformFeeAmount
+        );
         feeCollector[msg.sender][registrarType] = 0;
 
         emit WithdrawFee(msg.sender, partnerFeeAmount, platformFeeAmount, registrarType);
@@ -284,6 +301,11 @@ contract Synchronizer is ISynchronizer, Ownable {
     function toggleUseVirtualReserve() external onlyOwner {
         useVirtualReserve = !useVirtualReserve;
         emit ToggleUseVirtualReserve(useVirtualReserve);
+    }
+
+    function setExpireTime(uint256 expireTime_) external onlyOwner {
+        emit SetExpireTime(expireTime, expireTime_);
+        expireTime = expireTime_;
     }
 }
 

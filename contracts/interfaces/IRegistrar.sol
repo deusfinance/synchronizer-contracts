@@ -13,6 +13,8 @@ interface IRegistrar is IERC20Metadata {
 
     function totalSupply() external view returns (uint256);
 
+    function setType(uint256 registrarType_) external;
+
     function rename(string memory name, string memory symbol) external;
 
     function mint(address to, uint256 amount) external;

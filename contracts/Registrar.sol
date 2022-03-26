@@ -44,6 +44,10 @@ contract Registrar is dERC20, Ownable {
         _;
     }
 
+    function setType(uint256 registrarType_) external hasRole {
+        registrarType = registrarType_;
+    }
+
     function rename(string memory name, string memory symbol) external hasRole {
         _name = name;
         _symbol = symbol;

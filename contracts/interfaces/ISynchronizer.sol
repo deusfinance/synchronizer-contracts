@@ -29,6 +29,7 @@ interface ISynchronizer {
     event SetVirtualReserve(uint256 oldReserve, uint256 newReserve);
     event SetMuonContract(address oldContract, address newContract);
     event ToggleUseVirtualReserve(bool useVirtualReserve);
+    event SetExpireTime(uint256 oldExpireTime, uint256 newExpireTime);
 
     function deiContract() external view returns (address);
 
@@ -39,6 +40,8 @@ interface ISynchronizer {
     function scale() external view returns (uint256);
 
     function feeCollector(address partner, uint256 registrarType) external view returns (uint256);
+
+    function cap(address partner) external view returns (uint256);
 
     function virtualReserve() external view returns (uint256);
 

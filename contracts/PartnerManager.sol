@@ -17,22 +17,24 @@
 // Vahid: https://github.com/vahid-dev
 // M.R.M: https://github.com/mrmousavi78
 
-pragma solidity ^0.8.11;
+pragma solidity 0.8.13;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IPartnerManager.sol";
 
 /// @title Partner Manager
 /// @author DEUS Finance
 /// @notice Partner manager for the Synchronizer
-contract PartnerManager is IPartnerManager {
-    uint256[5] public minPlatformFee; // minimum platform fee set by DEUS DAO
-    uint256[5] public minTotalFee;  // minimum trading fee (total fee) set by DEUS DAO
-    mapping(address => uint256[5]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee, commodityFee, miscFee]
-    address public platformFeeCollector; // platform multisig address
+contract PartnerManager is IPartnerManager, Ownable {
     uint256 public scale = 1e18; // used for math
+    address public platformFeeCollector; // platform multisig address
+    uint256[] public minPlatformFee; // minimum platform fee set by DEUS DAO
+    uint256[] public minTotalFee;  // minimum trading fee (total fee) set by DEUS DAO
+    mapping(address => uint256[]) public partnerFee; // partnerId => [stockFee, cryptoFee, forexFee, commodityFee, miscFee]
     mapping(address => bool) public isPartner; // partnership of address
+    mapping(address => uint256) public maxCap; // maximum cap of open positions volume
 
-    constructor(address platformFeeCollector_, uint256[5] memory minPlatformFee_, uint256[5] memory minTotalFee_) {
+    constructor(address platformFeeCollector_, uint256[] memory minPlatformFee_, uint256[] memory minTotalFee_) {
         platformFeeCollector = platformFeeCollector_;
         minPlatformFee = minPlatformFee_;
         minTotalFee = minTotalFee_;
@@ -40,32 +42,36 @@ contract PartnerManager is IPartnerManager {
 
     /// @notice become a partner of DEUS DAO
     /// @dev fees (18 decimals) are expressed as multipliers, e.g. 1% should be inserted as 0.01
-    /// @param owner address of partner
-    /// @param partnerStockFee fee charged for stocks (e.g. 0.1%)
-    /// @param partnerCryptoFee fee charged for crypto (e.g. 0.1%)
-    /// @param partnerForexFee fee charged for forex (e.g. 0.1%)
-    /// @param partnerCommodityFee fee charged for commodities (e.g. 0.1%)
-    /// @param partnerMiscFee fee charged for miscellaneous assets (e.g. 0.1%)
-    function addPartner(
-        address owner,
-        uint256 partnerStockFee,
-        uint256 partnerCryptoFee,
-        uint256 partnerForexFee,
-        uint256 partnerCommodityFee,
-        uint256 partnerMiscFee
-    ) external {
-        require(!isPartner[owner], "PartnerManager: partner already exists");
-        require(
-            partnerStockFee + minPlatformFee[0] < scale &&
-                partnerCryptoFee + minPlatformFee[1] < scale &&
-                partnerForexFee + minPlatformFee[2] < scale &&
-                partnerCommodityFee + minPlatformFee[3] < scale &&
-                partnerMiscFee + minPlatformFee[4] < scale,
-            "PartnerManager: the total fee can not be GTE 100%"
-        );
-        isPartner[owner] = true;
-        partnerFee[owner] = [partnerStockFee, partnerCryptoFee, partnerForexFee, partnerCommodityFee, partnerMiscFee];
-        emit PartnerAdded(owner, partnerFee[owner]);
+    /// @param registrarType list of registrar types
+    /// @param partnerFee_ list of fee amounts of registrars
+    function addRegistrarFee(uint256[] memory registrarType, uint256[] memory partnerFee_) external {
+        isPartner[msg.sender] = true;
+        for (uint i = 0; i < registrarType.length; i++) {
+            require(minPlatformFee[registrarType[i]] > 0 && minTotalFee[registrarType[i]] > 0, "PartnerManager: INVALID_REGISTRAR_TYPE");
+            require(partnerFee_[registrarType[i]] + minPlatformFee[registrarType[i]] < scale, "PartnerManager: INVALID_TOTAL_FEE");
+            partnerFee[msg.sender][registrarType[i]] = partnerFee_[registrarType[i]];
+        }
+
+        emit RegistrarFeeAdded(msg.sender, registrarType, partnerFee_);
+    }
+
+    /// @notice add new registrars to the platform
+    /// @dev fees (18 decimals) are expressed as multipliers, e.g. 1% should be inserted as 0.01
+    /// @param registrarType list of registrar types
+    /// @param minPlatformFee_ list of minimum platform fee
+    /// @param minTotalFee_ list of minimum trading fee
+    function addPlatformFee(uint256[] memory registrarType, uint256[] memory minPlatformFee_, uint256[] memory minTotalFee_) external onlyOwner {
+        for (uint i = 0; i < registrarType.length; i++) {
+            minPlatformFee[registrarType[i]] = minPlatformFee_[registrarType[i]];
+            minTotalFee[registrarType[i]] = minTotalFee_[registrarType[i]];
+        }
+
+        emit PlatformFeeAdded(registrarType, minPlatformFee_, minTotalFee_);
+    }
+
+    function setCap(address partnerId, uint256 cap) external onlyOwner {
+        maxCap[partnerId] = cap;
+        emit SetCap(partnerId, cap);
     }
 }
 
