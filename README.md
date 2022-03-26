@@ -51,4 +51,4 @@ For security concerns, please email [admin@deus.finance](mailto:admin@deus.finan
 
 ## License
 
-[MIT](./LICENSE.md) © Mainframe Group Inc.
+[MIT](./LICENSE.md)

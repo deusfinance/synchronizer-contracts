@@ -1,11 +1,11 @@
 const { deploy } = require("../helpers/deploy_contract")
 
 module.exports = async ({
-  deiAddress,
+  mintHelper,
   muonAddress,
   partnerManagerAddress,
   minimumRequiredSignatures,
-  virtualReserve,
+  expireTime,
   appId,
 }) => {
   const deployer = process.env.SYNC_DEPLOYER
@@ -14,11 +14,11 @@ module.exports = async ({
     deployer: deployer,
     contractName: "Synchronizer",
     constructorArguments: [
-      deiAddress,
+      mintHelper,
       muonAddress,
       partnerManagerAddress,
       minimumRequiredSignatures,
-      virtualReserve,
+      expireTime,
       appId,
     ],
   })

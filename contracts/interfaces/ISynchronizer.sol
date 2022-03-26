@@ -23,7 +23,7 @@ interface ISynchronizer {
         uint256 collateralAmount,
         uint256 feeAmount
     );
-    event WithdrawFee(address platform, uint256 partnerFee, uint256 platformFee, uint256 registrarType);
+    event WithdrawFee(address partner, uint256 partnerFee, uint256 platformFee, uint256 registrarType);
     event SetMinimumRequiredSignatures(uint256 oldValue, uint256 newValue);
     event SetAppId(uint8 oldId, uint8 newId);
     event SetVirtualReserve(uint256 oldReserve, uint256 newReserve);
