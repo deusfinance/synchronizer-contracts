@@ -48,7 +48,6 @@ contract PartnerManager is IPartnerManager, Ownable {
     function addRegistrarFee(uint256[] memory registrarType, uint256[] memory partnerFee_) external {
         isPartner[msg.sender] = true;
         for (uint i = 0; i < registrarType.length; i++) {
-            require(minPlatformFee[registrarType[i]] > 0 && minTotalFee[registrarType[i]] > 0, "PartnerManager: INVALID_REGISTRAR_TYPE");
             require(partnerFee_[registrarType[i]] + minPlatformFee[registrarType[i]] < scale, "PartnerManager: INVALID_TOTAL_FEE");
             partnerFee[msg.sender][registrarType[i]] = partnerFee_[registrarType[i]];
         }

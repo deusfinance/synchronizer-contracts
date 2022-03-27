@@ -54,7 +54,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         uint256 minimumRequiredSignatures_,
         uint256 expireTime_,
         uint256 delayTimestamp_,
-        uint8 appId_
+        uint32 appId_
     ) ReentrancyGuard() {
         mintHelper = mintHelper_;
         muonContract = muonContract_;
@@ -66,13 +66,11 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     }
 
     /// @notice utility function used for generating trade signatures
-    /// @return the chainId
-    function getChainId() public view returns (uint256) {
-        uint256 id;
+    /// @return id chainId
+    function getChainId() public view returns (uint256 id) {
         assembly {
             id := chainid()
         }
-        return id;
     }
 
     /// @notice Calculate the fee percentage of registrar type for a specific partner

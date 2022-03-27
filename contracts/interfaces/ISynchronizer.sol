@@ -108,7 +108,7 @@ interface ISynchronizer {
 
     function setMinimumRequiredSignatures(uint256 minimumRequiredSignatures_) external;
 
-    function setAppId(uint8 appId_) external;
+    function setAppId(uint32 appId_) external;
 
     function setMuonContract(address muonContract_) external;
 
