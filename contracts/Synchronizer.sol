@@ -31,7 +31,7 @@ import "./interfaces/IPartnerManager.sol";
 contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     using ECDSA for bytes32;
 
-    uint8 public appId; // Muon's app Id
+    uint32 public appId; // Muon's app Id
     string public version = "v1.2.0";
     address public muonContract; // Address of Muon verifier contract
     address public deiContract = 0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3; // address of DEI token
@@ -164,7 +164,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external nonReentrant() returns (uint256 registrarAmount) {
+    ) external nonReentrant returns (uint256 registrarAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
@@ -176,7 +176,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         );
 
         {
-            bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(1), getChainId(), appId, timestamp));
+            bytes32 hash = keccak256(abi.encodePacked(appId, registrar, price, uint256(1), getChainId(), timestamp));
 
             IMuonV02 muon = IMuonV02(muonContract);
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
@@ -223,14 +223,14 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external nonReentrant() returns (uint256 deiAmount) {
+    ) external nonReentrant returns (uint256 deiAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
         require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
 
         {
-            bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(0), getChainId(), appId, timestamp));
+            bytes32 hash = keccak256(abi.encodePacked(appId, registrar, price, uint256(0), getChainId(), timestamp));
 
             IMuonV02 muon = IMuonV02(muonContract);
             require(muon.verify(_reqId, uint256(hash), sigs), "Synchronizer: UNVERIFIED_SIGNATURES");
@@ -261,7 +261,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
 
     /// @notice collects the tokens
     /// @param recipient recipient of the tokens
-    function collect(address recipient) external nonReentrant() {
+    function collect(address recipient) external nonReentrant {
         require(lastTrade[msg.sender] + delayTimestamp < block.timestamp, "Synchronizer: WAITING_TIME");
 
         uint256 cnt = tokens[msg.sender].length;

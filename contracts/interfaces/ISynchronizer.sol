@@ -60,7 +60,7 @@ interface ISynchronizer {
 
     function lastTrade(address partner) external view returns (uint256);
 
-    function appId() external view returns (uint8);
+    function appId() external view returns (uint32);
 
     function getChainId() external view returns (uint256);
 
