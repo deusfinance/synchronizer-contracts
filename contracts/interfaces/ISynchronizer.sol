@@ -7,7 +7,7 @@ import "./IMuonV02.sol";
 interface ISynchronizer {
     event Buy(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
@@ -16,7 +16,7 @@ interface ISynchronizer {
     );
     event Sell(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
@@ -30,6 +30,7 @@ interface ISynchronizer {
     event SetMuonContract(address oldContract, address newContract);
     event ToggleUseVirtualReserve(bool useVirtualReserve);
     event SetExpireTime(uint256 oldExpireTime, uint256 newExpireTime);
+    event SetDelayTimestamp(uint256 oldDelayTimestamp, uint256 newDelayTimestamp);
 
     function version() external view returns (string memory);
 
@@ -37,17 +38,27 @@ interface ISynchronizer {
 
     function muonContract() external view returns (address);
 
+    function deiContract() external view returns (address);
+
     function partnerManager() external view returns (address);
 
     function minimumRequiredSignatures() external view returns (uint256);
 
     function scale() external view returns (uint256);
 
+    function delayTimestamp() external view returns (uint256);
+
     function expireTime() external view returns (uint256);
 
     function feeCollector(address partner, uint256 registrarType) external view returns (uint256);
 
+    function tokens(address partner, uint256 registrarType) external view returns (address);
+
+    function balance(address user, address registrar) external view returns (uint256);
+
     function cap(address partner) external view returns (int256);
+
+    function lastTrade(address partner) external view returns (uint256);
 
     function appId() external view returns (uint8);
 
@@ -71,7 +82,7 @@ interface ISynchronizer {
 
     function buyFor(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
@@ -82,7 +93,7 @@ interface ISynchronizer {
 
     function sellFor(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
@@ -91,14 +102,19 @@ interface ISynchronizer {
         SchnorrSign[] calldata sigs
     ) external returns (uint256 deiAmount);
 
-    function withdrawFee(address receipient, uint256 registrarType) external;
+    function collect(address recipient) external;
+
+    function withdrawFee(address recipient, uint256 registrarType) external;
 
     function setMinimumRequiredSignatures(uint256 minimumRequiredSignatures_) external;
 
     function setAppId(uint8 appId_) external;
 
-
     function setMuonContract(address muonContract_) external;
+
+    function setExpireTime(uint256 expireTime_) external;
+    
+    function setDelayTimestamp(uint256 delayTimestamp_) external;
 }
 
 //Dar panah khoda

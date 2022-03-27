@@ -19,6 +19,7 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/ISynchronizer.sol";
 import "./interfaces/IMintHelper.sol";
 import "./interfaces/IRegistrar.sol";
@@ -27,20 +28,24 @@ import "./interfaces/IPartnerManager.sol";
 /// @title Synchronizer
 /// @author DEUS Finance
 /// @notice DEUS router for trading Registrar contracts
-contract Synchronizer is ISynchronizer, Ownable {
+contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     using ECDSA for bytes32;
 
-    // variables
-    string public version = "v1.2.0";
-    address public muonContract; // address of Muon verifier contract
-    address public mintHelper; // address of mint helper contract
-    address public partnerManager; // address of partner manager contract
-    uint256 public minimumRequiredSignatures; // minimum number of signatures required
-    uint256 public scale = 1e18; // used for math
-    uint256 public expireTime; // valid time of muon signatures
-    mapping(address => uint256[]) public feeCollector; // partnerId => cumulativeFee
-    mapping(address => int256) public cap; // partnerId => openPositionsVolume
     uint8 public appId; // Muon's app Id
+    string public version = "v1.2.0";
+    address public muonContract; // Address of Muon verifier contract
+    address public deiContract = 0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3; // address of DEI token
+    address public mintHelper; // Address of mint helper contract
+    address public partnerManager; // Address of partner manager contract
+    uint256 public minimumRequiredSignatures; // Minimum number of signatures required
+    uint256 public scale = 1e18; // Used for math
+    uint256 public expireTime; // Valid time of muon signatures
+    uint256 public delayTimestamp; // Time to wait before being able to collect()
+    mapping(address => int256) public cap; // partnerId => openPositionsVolume
+    mapping(address => uint256) public lastTrade; // Address => last trade timestamp
+    mapping(address => uint256[]) public feeCollector; // partnerId => cumulativeFee
+    mapping(address => address[]) public tokens; // Address => list of collectibale tokens
+    mapping(address => mapping(address => uint256)) public balance; // Balance of collectible tokens
 
     constructor(
         address mintHelper_,
@@ -48,13 +53,15 @@ contract Synchronizer is ISynchronizer, Ownable {
         address partnerManager_,
         uint256 minimumRequiredSignatures_,
         uint256 expireTime_,
+        uint256 delayTimestamp_,
         uint8 appId_
-    ) {
+    ) ReentrancyGuard() {
         mintHelper = mintHelper_;
         muonContract = muonContract_;
         partnerManager = partnerManager_;
         minimumRequiredSignatures = minimumRequiredSignatures_;
         expireTime = expireTime_;
+        delayTimestamp = delayTimestamp_;
         appId = appId_;
     }
 
@@ -141,7 +148,7 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @notice buy a Registrar
     /// @dev SchnorrSign is a TSS structure
     /// @param partnerId partner address
-    /// @param receipient receipient of the Registrar
+    /// @param recipient recipient of the Registrar
     /// @param registrar Registrar token address
     /// @param amountIn DEI amount to spend (18 decimals)
     /// @param price registrar price according to Muon
@@ -150,20 +157,23 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @param sigs Muon TSS signatures
     function buyFor(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
         uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external returns (uint256 registrarAmount) {
+    ) external nonReentrant() returns (uint256 registrarAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
         require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
         require(int256(amountIn) > 0, "Synchronizer: INVALID_AMOUNTIN");
-        require(int256(amountIn) + cap[partnerId] <= IPartnerManager(partnerManager).maxCap(partnerId), "Synchronizer: MAX_CAP");
+        require(
+            int256(amountIn) + cap[partnerId] <= IPartnerManager(partnerManager).maxCap(partnerId),
+            "Synchronizer: MAX_CAP"
+        );
 
         {
             bytes32 hash = keccak256(abi.encodePacked(registrar, price, uint256(1), getChainId(), appId, timestamp));
@@ -182,15 +192,22 @@ contract Synchronizer is ISynchronizer, Ownable {
         cap[partnerId] += int256(amountIn);
 
         registrarAmount = (collateralAmount * scale) / price;
-        IRegistrar(registrar).mint(receipient, registrarAmount);
 
-        emit Buy(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
+        IRegistrar(registrar).mint(address(this), registrarAmount);
+
+        {
+            lastTrade[recipient] = block.timestamp;
+            balance[recipient][registrar] += registrarAmount;
+            tokens[recipient].push(registrar);
+        }
+
+        emit Buy(partnerId, recipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
 
     /// @notice sell a Registrar
     /// @dev SchnorrSign is a TSS structure
     /// @param partnerId partner address
-    /// @param receipient receipient of the collateral
+    /// @param recipient recipient of the collateral
     /// @param registrar Registrar token address
     /// @param amountIn registrar amount to spend (18 decimals)
     /// @param price registrar price according to Muon
@@ -199,14 +216,14 @@ contract Synchronizer is ISynchronizer, Ownable {
     /// @param sigs Muon TSS signatures
     function sellFor(
         address partnerId,
-        address receipient,
+        address recipient,
         address registrar,
         uint256 amountIn,
         uint256 price,
         uint256 timestamp,
         bytes calldata _reqId,
         SchnorrSign[] calldata sigs
-    ) external returns (uint256 deiAmount) {
+    ) external nonReentrant() returns (uint256 deiAmount) {
         require(amountIn > 0, "Synchronizer: INSUFFICIENT_INPUT_AMOUNT");
         require(IPartnerManager(partnerManager).isPartner(partnerId), "Synchronizer: INVALID_PARTNER_ID");
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
@@ -229,18 +246,42 @@ contract Synchronizer is ISynchronizer, Ownable {
         IRegistrar(registrar).burn(msg.sender, amountIn);
 
         deiAmount = collateralAmount - feeAmount;
-        IMintHelper(mintHelper).mint(receipient, deiAmount);
+        IMintHelper(mintHelper).mint(address(this), deiAmount);
+
+        {
+            lastTrade[recipient] = block.timestamp;
+            balance[recipient][deiContract] += deiAmount;
+            tokens[recipient].push(deiContract);
+        }
 
         cap[partnerId] -= int256(collateralAmount);
 
-        emit Sell(partnerId, receipient, registrar, amountIn, price, collateralAmount, feeAmount);
+        emit Sell(partnerId, recipient, registrar, amountIn, price, collateralAmount, feeAmount);
+    }
+
+    /// @notice collects the tokens
+    /// @param recipient recipient of the tokens
+    function collect(address recipient) external nonReentrant() {
+        require(lastTrade[msg.sender] + delayTimestamp < block.timestamp, "Synchronizer: WAITING_TIME");
+
+        uint256 cnt = tokens[msg.sender].length;
+
+        for (uint256 i = 0; i < cnt; i++) {
+            address token = tokens[msg.sender][i];
+            uint256 amount = balance[msg.sender][token];
+            if (amount > 0) {
+                balance[msg.sender][token] = 0;
+                IERC20(token).transfer(recipient, amount);
+            }
+        }
+        delete tokens[msg.sender];
     }
 
     /// @notice withdraw accumulated trading fee
     /// @dev fee will be minted in DEI
-    /// @param receipient receiver of fee
+    /// @param recipient receiver of fee
     /// @param registrarType type of registrar
-    function withdrawFee(address receipient, uint256 registrarType) external {
+    function withdrawFee(address recipient, uint256 registrarType) external {
         require(feeCollector[msg.sender][registrarType] > 0, "Synchronizer: INSUFFICIENT_FEE");
 
         uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType);
@@ -248,7 +289,7 @@ contract Synchronizer is ISynchronizer, Ownable {
         uint256 partnerFeeAmount = (feeCollector[msg.sender][registrarType] * partnerFee) / scale;
         uint256 platformFeeAmount = feeCollector[msg.sender][registrarType] - partnerFeeAmount;
 
-        IMintHelper(mintHelper).mint(receipient, partnerFeeAmount);
+        IMintHelper(mintHelper).mint(recipient, partnerFeeAmount);
         IMintHelper(mintHelper).mint(IPartnerManager(partnerManager).platformFeeCollector(), platformFeeAmount);
 
         feeCollector[msg.sender][registrarType] = 0;
@@ -256,14 +297,14 @@ contract Synchronizer is ISynchronizer, Ownable {
         emit WithdrawFee(msg.sender, partnerFeeAmount, platformFeeAmount, registrarType);
     }
 
-    /// @notice change the minimum required signatures for trading
+    /// @notice changes the minimum required signatures for trading
     /// @param minimumRequiredSignatures_ number of required signatures
     function setMinimumRequiredSignatures(uint256 minimumRequiredSignatures_) external onlyOwner {
         emit SetMinimumRequiredSignatures(minimumRequiredSignatures, minimumRequiredSignatures_);
         minimumRequiredSignatures = minimumRequiredSignatures_;
     }
 
-    /// @notice change Muon's app id
+    /// @notice changes Muon's app id
     /// @dev appIdd distinguishes us from other Muon apps
     /// @param appId_ Muon's app id
     function setAppId(uint8 appId_) external onlyOwner {
@@ -271,14 +312,23 @@ contract Synchronizer is ISynchronizer, Ownable {
         appId = appId_;
     }
 
+    /// @notice changes Muon's verifier contract
+    /// @param muonContract_ address of muon contract
     function setMuonContract(address muonContract_) external onlyOwner {
         emit SetMuonContract(muonContract, muonContract_);
         muonContract = muonContract_;
     }
 
+    /// @notice changes expire time
+    /// @param expireTime_ new exipre time
     function setExpireTime(uint256 expireTime_) external onlyOwner {
         emit SetExpireTime(expireTime, expireTime_);
         expireTime = expireTime_;
+    }
+
+    function setDelayTimestamp(uint256 delayTimestamp_) external onlyOwner {
+        emit SetDelayTimestamp(delayTimestamp, delayTimestamp_);
+        delayTimestamp = delayTimestamp_;
     }
 }
 
