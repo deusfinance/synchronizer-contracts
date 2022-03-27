@@ -28,4 +28,6 @@ interface IPartnerManager {
         uint256[] memory minPlatformFee_,
         uint256[] memory minTotalFee_
     ) external;
+
+    function setCap(address partnerId, int256 cap, bool isNegative) external;
 }

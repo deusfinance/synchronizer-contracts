@@ -70,8 +70,12 @@ contract PartnerManager is IPartnerManager, Ownable {
         emit PlatformFeeAdded(registrarType, minPlatformFee_, minTotalFee_);
     }
 
-    function setCap(address partnerId, int256 cap) external onlyOwner {
-        require(cap >= 0, "ParnerManager: INVALID_CAP");
+    /// @notice sets maximum cap for partner
+    /// @param partnerId Address of partner
+    /// @param cap Maximum cap of partner
+    /// @param isNegative Is true when you want to set negative cap
+    function setCap(address partnerId, int256 cap, bool isNegative) external onlyOwner {
+        if (!isNegative) { require(cap >= 0, "ParnerManager: INVALID_CAP"); }
         maxCap[partnerId] = cap;
         emit SetCap(partnerId, cap);
     }
