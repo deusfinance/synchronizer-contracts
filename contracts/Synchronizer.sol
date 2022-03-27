@@ -307,7 +307,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     /// @notice changes Muon's app id
     /// @dev appIdd distinguishes us from other Muon apps
     /// @param appId_ Muon's app id
-    function setAppId(uint8 appId_) external onlyOwner {
+    function setAppId(uint32 appId_) external onlyOwner {
         emit SetAppId(appId, appId_);
         appId = appId_;
     }
