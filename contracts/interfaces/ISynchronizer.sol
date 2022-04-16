@@ -32,7 +32,7 @@ interface ISynchronizer {
     event SetExpireTime(uint256 oldExpireTime, uint256 newExpireTime);
     event SetDelayTimestamp(uint256 oldDelayTimestamp, uint256 newDelayTimestamp);
     event SetMintHelper(address oldMintHelper, address newMintHelper);
-    event Collect(address user, address token, uint256 amount);
+    event Collect(address user, uint256 amount);
 
     function version() external view returns (string memory);
 
@@ -54,9 +54,7 @@ interface ISynchronizer {
 
     function feeCollector(address partner, uint256 registrarType) external view returns (uint256);
 
-    function tokens(address partner, uint256 registrarType) external view returns (address);
-
-    function balance(address user, address registrar) external view returns (uint256);
+    function balance(address user) external view returns (uint256);
 
     function cap(address partner) external view returns (int256);
 
@@ -104,7 +102,7 @@ interface ISynchronizer {
         SchnorrSign[] calldata sigs
     ) external returns (uint256 deiAmount);
 
-    function collect(address recipient) external;
+    function collect() external;
 
     function withdrawFee(address recipient, uint256 registrarType) external;
 

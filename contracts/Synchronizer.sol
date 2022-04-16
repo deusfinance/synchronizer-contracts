@@ -32,7 +32,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     using ECDSA for bytes32;
 
     uint32 public appId; // Muon's app Id
-    string public version = "v1.2.0";
+    string public version = "v1.3.0";
     address public muonContract; // Address of Muon verifier contract
     address public deiContract = 0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3; // address of DEI token
     address public mintHelper; // Address of mint helper contract
@@ -44,8 +44,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     mapping(address => int256) public cap; // partnerId => openPositionsVolume
     mapping(address => uint256) public lastTrade; // Address => last trade timestamp
     mapping(address => uint256[]) public feeCollector; // partnerId => cumulativeFee
-    mapping(address => address[]) public tokens; // Address => list of collectibale tokens
-    mapping(address => mapping(address => uint256)) public balance; // Balance of collectible tokens
+    mapping(address => uint256) public balance; // Balance of collectible tokens
 
     constructor(
         address owner,
@@ -112,7 +111,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         uint256 fee = getTotalFee(partnerId, registrar);
         if (action == 0) {
             // sell Registrar
-            amountIn = (amountOut * price) / (scale - fee); // x = y * (price) * (1 / 1 - fee)
+            amountIn = (amountOut * price) / (scale - fee); // x = y * (price) * (1 / (1 - fee))
         } else {
             // buy Registrar
             amountIn = (amountOut * scale * scale) / (price * (scale - fee)); // x = y * / (price * (1 - fee))
@@ -196,13 +195,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
 
         registrarAmount = (collateralAmount * scale) / price;
 
-        IRegistrar(registrar).mint(address(this), registrarAmount);
-
-        {
-            lastTrade[recipient] = block.timestamp;
-            balance[recipient][registrar] += registrarAmount;
-            tokens[recipient].push(registrar);
-        }
+        IRegistrar(registrar).mint(recipient, registrarAmount);
 
         emit Buy(partnerId, recipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
@@ -250,12 +243,10 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         IRegistrar(registrar).burn(msg.sender, amountIn);
 
         deiAmount = collateralAmount - feeAmount;
-        IMintHelper(mintHelper).mint(address(this), deiAmount);
 
         {
             lastTrade[recipient] = block.timestamp;
-            balance[recipient][deiContract] += deiAmount;
-            tokens[recipient].push(deiContract);
+            balance[recipient] += deiAmount;
         }
 
         cap[partnerId] -= int256(collateralAmount);
@@ -273,18 +264,12 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     function collect() external nonReentrant {
         require(lastTrade[msg.sender] + delayTimestamp < block.timestamp, "Synchronizer: WAITING_TIME");
 
-        uint256 cnt = tokens[msg.sender].length;
-
-        for (uint256 i = 0; i < cnt; i++) {
-            address token = tokens[msg.sender][i];
-            uint256 amount = balance[msg.sender][token];
-            if (amount > 0) {
-                balance[msg.sender][token] = 0;
-                IERC20(token).transfer(msg.sender, amount);
-                emit Collect(msg.sender, token, amount);
-            }
+        uint256 amount = balance[msg.sender];
+        if (amount > 0) {
+            balance[msg.sender] = 0;
+            IMintHelper(mintHelper).mint(msg.sender, amount);
+            emit Collect(msg.sender, amount);
         }
-        delete tokens[msg.sender];
     }
 
     /// @notice withdraw accumulated trading fee
