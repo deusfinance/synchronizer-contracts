@@ -31,6 +31,8 @@ interface ISynchronizer {
     event ToggleUseVirtualReserve(bool useVirtualReserve);
     event SetExpireTime(uint256 oldExpireTime, uint256 newExpireTime);
     event SetDelayTimestamp(uint256 oldDelayTimestamp, uint256 newDelayTimestamp);
+    event SetMintHelper(address oldMintHelper, address newMintHelper);
+    event Collect(address user, address token, uint256 amount);
 
     function version() external view returns (string memory);
 
@@ -113,8 +115,10 @@ interface ISynchronizer {
     function setMuonContract(address muonContract_) external;
 
     function setExpireTime(uint256 expireTime_) external;
-    
+
     function setDelayTimestamp(uint256 delayTimestamp_) external;
+
+    function setMintHelper(address mintHelper_) external;
 }
 
 //Dar panah khoda

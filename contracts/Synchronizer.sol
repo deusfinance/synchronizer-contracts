@@ -48,6 +48,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     mapping(address => mapping(address => uint256)) public balance; // Balance of collectible tokens
 
     constructor(
+        address owner,
         address mintHelper_,
         address muonContract_,
         address partnerManager_,
@@ -63,6 +64,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         expireTime = expireTime_;
         delayTimestamp = delayTimestamp_;
         appId = appId_;
+        transferOwnership(owner);
     }
 
     /// @notice utility function used for generating trade signatures
@@ -78,12 +80,14 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     /// @param registrar Registrar token address
     /// @return fee percentage (scale is 1e18)
     function getTotalFee(address partnerId, address registrar) public view returns (uint256 fee) {
-        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(
-            partnerId,
-            IRegistrar(registrar).registrarType()
-        );
-        uint256 platformFee = IPartnerManager(partnerManager).minPlatformFee(IRegistrar(registrar).registrarType());
-        uint256 minTotalFee = IPartnerManager(partnerManager).minTotalFee(IRegistrar(registrar).registrarType());
+        uint256 registrarType = IRegistrar(registrar).registrarType();
+        return _getTotalFee(partnerId, registrarType);
+    }
+
+    function _getTotalFee(address partnerId, uint256 registrarType) internal view returns (uint256 fee) {
+        uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(partnerId, registrarType);
+        uint256 platformFee = IPartnerManager(partnerManager).minPlatformFee(registrarType);
+        uint256 minTotalFee = IPartnerManager(partnerManager).minTotalFee(registrarType);
         if (partnerFee + platformFee <= minTotalFee) {
             fee = minTotalFee;
         } else {
@@ -173,6 +177,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
             "Synchronizer: MAX_CAP"
         );
 
+        _initialize(partnerId);
         {
             bytes32 hash = keccak256(abi.encodePacked(appId, registrar, price, uint256(1), getChainId(), timestamp));
 
@@ -227,6 +232,7 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         require(sigs.length >= minimumRequiredSignatures, "Synchronizer: INSUFFICIENT_SIGNATURES");
         require(timestamp + expireTime > block.timestamp, "Synchronizer: EXPIRED_SIGNATURE");
 
+        _initialize(partnerId);
         {
             bytes32 hash = keccak256(abi.encodePacked(appId, registrar, price, uint256(0), getChainId(), timestamp));
 
@@ -257,9 +263,14 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         emit Sell(partnerId, recipient, registrar, amountIn, price, collateralAmount, feeAmount);
     }
 
+    function _initialize(address partnerId) internal {
+        if (feeCollector[partnerId].length == 0) {
+            feeCollector[partnerId] = new uint256[](100);
+        }
+    }
+
     /// @notice collects the tokens
-    /// @param recipient recipient of the tokens
-    function collect(address recipient) external nonReentrant {
+    function collect() external nonReentrant {
         require(lastTrade[msg.sender] + delayTimestamp < block.timestamp, "Synchronizer: WAITING_TIME");
 
         uint256 cnt = tokens[msg.sender].length;
@@ -269,7 +280,8 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
             uint256 amount = balance[msg.sender][token];
             if (amount > 0) {
                 balance[msg.sender][token] = 0;
-                IERC20(token).transfer(recipient, amount);
+                IERC20(token).transfer(msg.sender, amount);
+                emit Collect(msg.sender, token, amount);
             }
         }
         delete tokens[msg.sender];
@@ -279,12 +291,13 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
     /// @dev fee will be minted in DEI
     /// @param recipient receiver of fee
     /// @param registrarType type of registrar
-    function withdrawFee(address recipient, uint256 registrarType) external {
+    function withdrawFee(address recipient, uint256 registrarType) external nonReentrant {
         require(feeCollector[msg.sender][registrarType] > 0, "Synchronizer: INSUFFICIENT_FEE");
 
         uint256 partnerFee = IPartnerManager(partnerManager).partnerFee(msg.sender, registrarType);
 
-        uint256 partnerFeeAmount = (feeCollector[msg.sender][registrarType] * partnerFee) / scale;
+        uint256 partnerFeeAmount = (feeCollector[msg.sender][registrarType] * partnerFee) /
+            _getTotalFee(msg.sender, registrarType);
         uint256 platformFeeAmount = feeCollector[msg.sender][registrarType] - partnerFeeAmount;
 
         IMintHelper(mintHelper).mint(recipient, partnerFeeAmount);
@@ -324,9 +337,18 @@ contract Synchronizer is ISynchronizer, ReentrancyGuard, Ownable {
         expireTime = expireTime_;
     }
 
+    /// @notice changes delay time
+    /// @param delayTimestamp_ new delay time
     function setDelayTimestamp(uint256 delayTimestamp_) external onlyOwner {
         emit SetDelayTimestamp(delayTimestamp, delayTimestamp_);
         delayTimestamp = delayTimestamp_;
+    }
+
+    /// @notice changes the mint helper contract
+    /// @param mintHelper_ address of new mint helper contract
+    function setMintHelper(address mintHelper_) external onlyOwner {
+        emit SetMintHelper(mintHelper, mintHelper_);
+        mintHelper = mintHelper_;
     }
 }
 

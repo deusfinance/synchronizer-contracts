@@ -45,13 +45,13 @@ module.exports = {
 			gasMultiplier: 1.2
 		},
    		fantom: {
-			url: `https://rpc.fantom.network`,
+			url: `https://rpc.ankr.com/fantom/${process.env.ANKR_API_KEY}`,
 			accounts: [
 				process.env.SYNC_DEPLOYER_PRIVATE_KEY
 			],
 			chainId: 250,
 			gas: "auto",
-			gasPrice: 351100000000,	//800.1 Gwei
+			gasPrice: 900100000000,	//800.1 Gwei
 			gasMultiplier: 1.2
 		},
 	},

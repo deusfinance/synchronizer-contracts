@@ -6,7 +6,8 @@
     "conduct:fantom": "npx hardhat run ./scripts/helpers/conduct_SP500.js --network fantom",
     "conduct-crypto-forex:fantom": "npx hardhat run ./scripts/deploy-crypto-and-forex.js --network fantom",
     "deploy:rinkeby": "npx hardhat run ./scripts/deploy-rinkeby.js --network rinkeby",
-    "deploy:fantom": "npx hardhat run ./scripts/deploy-fantom.js --network fantom"
+    "deploy:fantom": "npx hardhat run ./scripts/deploy-fantom.js --network fantom",
+    "deploy:v1.2": "npx hardhat run ./scripts/deploy-sync-v1.2.0.js --network fantom"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
